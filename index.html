@@ -285,6 +285,11 @@
   .ab-tag{font-size:12px;color:var(--muted)}
   .ab-pill{margin-left:auto;font-size:10.5px;color:var(--ac);background:#fff;border:1px solid color-mix(in srgb,var(--ac) 40%,var(--line));
     padding:3px 9px;border-radius:999px;font-weight:600;text-align:center;max-width:220px}
+  .ab-right{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+  .ab-right .ab-pill{margin-left:0}
+  .ab-watch{font-size:11.5px;font-weight:700;color:#fff;background:var(--ac);border-radius:999px;padding:4px 12px;
+    text-decoration:none;white-space:nowrap;box-shadow:var(--shadow)}
+  .ab-watch:hover{filter:brightness(1.1)}
   .speops{margin-top:14px;border:1px dashed var(--line);border-radius:8px;background:#fbfbfa}
   .speops>summary{cursor:pointer;padding:9px 12px;font-size:12px;color:var(--muted);font-weight:600;list-style:none}
   .speops>summary::-webkit-details-marker{display:none}
@@ -1275,7 +1280,10 @@ function renderApp(){
   banner.innerHTML=`<div class="ab-icon">${appGlyph(s.key)}</div>
     <div class="ab-txt"><div class="ab-name">${s.app}<span class="ab-ind">${s.label}</span></div>
       <div class="ab-tag">${s.tagline}</div></div>
-    <div class="ab-pill">leads with ${s.leads||s.capability}</div>`;
+    <div class="ab-right">
+      <a class="ab-watch" href="videos/${s.key}.webm" target="_blank" rel="noopener" title="End-to-end demo with split-screen SPE calls">▶ Watch demo</a>
+      <div class="ab-pill">leads with ${s.leads||s.capability}</div>
+    </div>`;
   body.appendChild(banner);
 
   if(UI.aiResult){ const r=renderAiResult(); r.style.margin="0 0 10px"; body.appendChild(r); }
