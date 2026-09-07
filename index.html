@@ -1,0 +1,2566 @@
+<!DOCTYPE html>
+<!--
+  SharePoint Embedded (SPE) Interactive Sandbox
+  ------------------------------------------------
+  A single-file, dependency-free, zero-setup sandbox intended to be embedded
+  inside a public article (e.g. Microsoft Learn). It SIMULATES the SharePoint
+  Embedded Microsoft Graph backend so developers can:
+
+    * Try 5 distinct industry apps (each showcases a different SPE capability)
+    * See the live app UI on the left
+    * See the exact Graph API calls + the simulated backend objects on the right
+    * Copy the real sample code for each action
+
+  No tenant, app registration, login, or network calls are required.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SharePoint Embedded — Interactive Sandbox</title>
+<style>
+  :root{
+    --bg:#faf9f8; --panel:#ffffff; --ink:#242424; --muted:#605e5c;
+    --line:#e1dfdd; --accent:#0f6cbd; --accent-d:#0a4f8a;
+    --green:#0e7a0b; --amber:#8a6d00; --red:#a4262c; --purple:#5c2e91;
+    --code-bg:#1e1e1e; --code-ink:#d4d4d4;
+    --get:#0e7a0b; --post:#0f6cbd; --put:#8a6d00; --del:#a4262c; --patch:#5c2e91;
+    --radius:8px; --shadow:0 1.6px 3.6px rgba(0,0,0,.10),0 .3px .9px rgba(0,0,0,.08);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{font-family:"Segoe UI",-apple-system,BlinkMacSystemFont,Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--ink);font-size:14px;line-height:1.45}
+  button{font-family:inherit;cursor:pointer}
+  .app-shell{display:flex;flex-direction:column;height:100vh}
+
+  /* ---------- Top bar ---------- */
+  .topbar{display:flex;align-items:center;gap:14px;padding:10px 16px;background:var(--panel);
+    border-bottom:1px solid var(--line);box-shadow:var(--shadow);z-index:5;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:600}
+  .brand .logo{width:26px;height:26px;border-radius:6px;background:linear-gradient(135deg,var(--accent),var(--purple));
+    display:grid;place-items:center;color:#fff;font-weight:700;font-size:13px}
+  .brand small{display:block;font-weight:400;color:var(--muted);font-size:11px;margin-top:-2px}
+  .verticals{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+  .vtab{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 12px;font-size:12.5px;
+    color:var(--muted);display:flex;align-items:center;gap:7px;transition:.12s}
+  .vtab:hover{border-color:var(--accent);color:var(--accent)}
+  .vtab.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  .vtab .dot{width:8px;height:8px;border-radius:50%;background:currentColor;opacity:.85}
+
+  /* ---------- Split layout ---------- */
+  .split{display:grid;grid-template-columns:1fr 6px 1fr;flex:1;min-height:0}
+  .pane{min-height:0;overflow:auto;display:flex;flex-direction:column}
+  .divider{background:var(--line);cursor:col-resize}
+  .pane-head{position:sticky;top:0;background:var(--panel);border-bottom:1px solid var(--line);
+    padding:10px 14px;display:flex;align-items:center;gap:10px;z-index:3}
+  .pane-head h2{font-size:13px;margin:0;font-weight:600;letter-spacing:.2px}
+  .pane-head .sub{color:var(--muted);font-size:11.5px}
+  .pill{font-size:10.5px;padding:2px 8px;border-radius:999px;background:#eef4fb;color:var(--accent);font-weight:600}
+
+  /* ---------- Left app ---------- */
+  .app-body{padding:14px;display:flex;flex-direction:column;gap:12px}
+  .scenario-card{background:linear-gradient(135deg,#0f6cbd10,#5c2e9110);border:1px solid var(--line);
+    border-radius:var(--radius);padding:12px 14px}
+  .scenario-card h3{margin:0 0 3px;font-size:15px}
+  .scenario-card p{margin:0;color:var(--muted);font-size:12.5px}
+  .scenario-card .cap{margin-top:8px;display:inline-flex;align-items:center;gap:6px;font-size:11.5px;
+    background:#fff;border:1px solid var(--line);border-radius:999px;padding:3px 10px;color:var(--accent);font-weight:600}
+
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap}
+  .btn{border:1px solid var(--line);background:#fff;border-radius:6px;padding:7px 12px;font-size:12.5px;
+    display:inline-flex;align-items:center;gap:6px;color:var(--ink);transition:.12s}
+  .btn:hover{border-color:var(--accent);color:var(--accent)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.primary:hover{background:var(--accent-d)}
+  .btn.ghost{background:transparent;border-color:transparent;color:var(--muted)}
+  .btn.ghost:hover{color:var(--accent);background:#eef4fb}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn .ic{font-size:14px}
+
+  .browser{background:#fff;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+  .breadcrumb{display:flex;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid var(--line);
+    font-size:12.5px;color:var(--muted);flex-wrap:wrap}
+  .breadcrumb a{color:var(--accent);cursor:pointer;text-decoration:none}
+  .empty{padding:26px;text-align:center;color:var(--muted);font-size:12.5px}
+  .row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #f3f2f1}
+  .row:last-child{border-bottom:0}
+  .row:hover{background:#f8fbff}
+  .row .ic{font-size:16px;width:20px;text-align:center}
+  .row .name{font-weight:500;cursor:pointer}
+  .row .name:hover{color:var(--accent);text-decoration:underline}
+  .row .meta{margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+  .tag{font-size:10.5px;padding:2px 7px;border-radius:4px;background:#f3f2f1;color:var(--muted);white-space:nowrap}
+  .tag.green{background:#e6f4e6;color:var(--green)} .tag.amber{background:#fdf3d6;color:var(--amber)}
+  .tag.red{background:#fbe9ea;color:var(--red)} .tag.blue{background:#eef4fb;color:var(--accent)}
+  .tag.purple{background:#f0e9f7;color:var(--purple)}
+  .rowbtn{border:none;background:transparent;color:var(--muted);font-size:12px;padding:3px 6px;border-radius:4px}
+  .rowbtn:hover{background:#eef4fb;color:var(--accent)}
+
+  .containers{display:flex;flex-direction:column;gap:6px}
+  .cont{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);
+    border-radius:6px;background:#fff;cursor:pointer;transition:.12s}
+  .cont:hover{border-color:var(--accent);box-shadow:var(--shadow)}
+  .cont.active{border-color:var(--accent);background:#f4f9ff}
+  .cont .avatar{width:30px;height:30px;border-radius:7px;display:grid;place-items:center;color:#fff;font-weight:700;font-size:12px}
+  .cont .t{font-weight:600}.cont .s{font-size:11.5px;color:var(--muted)}
+  .cont .meta{margin-left:auto;text-align:right}
+
+  /* ---------- Right pane ---------- */
+  .tabs{display:flex;gap:2px;padding:6px 10px 0;border-bottom:1px solid var(--line);background:var(--panel);
+    position:sticky;top:0;z-index:3}
+  .tab{border:1px solid transparent;border-bottom:none;background:transparent;padding:7px 13px;font-size:12.5px;
+    color:var(--muted);border-radius:6px 6px 0 0}
+  .tab:hover{color:var(--accent)}
+  .tab.active{background:#fff;border-color:var(--line);color:var(--ink);font-weight:600}
+  .tab .badge{background:var(--accent);color:#fff;border-radius:999px;font-size:10px;padding:0 6px;margin-left:5px}
+  .tabpane{display:none;padding:12px;flex:1;min-height:0}
+  .tabpane.active{display:block}
+
+  /* API log */
+  .logbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .call{border:1px solid var(--line);border-radius:6px;margin-bottom:8px;overflow:hidden;background:#fff}
+  .call-head{display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer;font-size:12px}
+  .call-head:hover{background:#f8fbff}
+  .method{font-weight:700;font-size:10.5px;padding:2px 7px;border-radius:4px;color:#fff;min-width:44px;text-align:center}
+  .m-GET{background:var(--get)} .m-POST{background:var(--post)} .m-PUT{background:var(--put)}
+  .m-DELETE{background:var(--del)} .m-PATCH{background:var(--patch)}
+  .call-url{font-family:"Cascadia Code",Consolas,monospace;font-size:11.5px;color:var(--ink);word-break:break-all;flex:1}
+  .status{font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:4px}
+  .s2{background:#e6f4e6;color:var(--green)} .s4{background:#fbe9ea;color:var(--red)}
+  .call-body{display:none;border-top:1px solid var(--line)}
+  .call.open .call-body{display:block}
+  .kv{padding:8px 10px;font-size:11px;color:var(--muted);border-bottom:1px solid #f3f2f1}
+  pre{margin:0;background:var(--code-bg);color:var(--code-ink);padding:10px 12px;overflow:auto;
+    font-family:"Cascadia Code",Consolas,monospace;font-size:11.5px;line-height:1.5}
+  .tok-key{color:#9cdcfe}.tok-str{color:#ce9178}.tok-num{color:#b5cea8}.tok-bool{color:#569cd6}.tok-punc{color:#d4d4d4}
+
+  /* Backend tree */
+  .tree{font-size:12.5px}
+  .node{padding:3px 0}
+  .node .lbl{display:flex;align-items:center;gap:7px}
+  .node .lbl .ic{width:18px;text-align:center}
+  .node .children{margin-left:18px;border-left:1px dashed var(--line);padding-left:10px}
+  .node .props{margin-left:25px;color:var(--muted);font-size:11px}
+  .node .props code{background:#f3f2f1;padding:1px 5px;border-radius:4px;color:var(--ink)}
+  .ctype{color:var(--purple);font-weight:600}
+  .cnt{color:var(--accent);font-weight:600}
+
+  /* Code tab */
+  .code-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .code-head .lang{font-size:11px;color:var(--muted)}
+  .copy{border:1px solid var(--line);background:#fff;border-radius:5px;padding:4px 10px;font-size:11.5px}
+  .copy:hover{border-color:var(--accent);color:var(--accent)}
+  .hint{color:var(--muted);font-size:11.5px;margin:8px 2px 0}
+
+  /* Try-it console */
+  .pg-intro{font-size:12px;color:var(--muted);margin-bottom:10px;background:#eef4fb;border:1px solid #cfe2f5;
+    border-radius:6px;padding:8px 10px}
+  .pg-intro b{color:var(--accent)}
+  .pg-row{display:flex;gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap}
+  .pg-row label{font-size:11px;font-weight:600;color:var(--muted);min-width:64px}
+  .pg-method{border:1px solid var(--line);border-radius:6px;padding:8px;font-size:12.5px;font-weight:700;
+    font-family:"Cascadia Code",Consolas,monospace;background:#fff}
+  .pg-path{flex:1;min-width:160px;border:1px solid var(--line);border-radius:6px;padding:8px 10px;
+    font-family:"Cascadia Code",Consolas,monospace;font-size:12px}
+  .pg-select{width:100%;border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:12.5px;background:#fff}
+  .pg-body{width:100%;min-height:120px;border:1px solid var(--line);border-radius:6px;padding:10px;
+    font-family:"Cascadia Code",Consolas,monospace;font-size:12px;line-height:1.5;resize:vertical;
+    background:var(--code-bg);color:var(--code-ink)}
+  .pg-actions{display:flex;gap:8px;margin:10px 0}
+  .pg-send{background:var(--green);border:1px solid var(--green);color:#fff;border-radius:6px;padding:8px 16px;
+    font-size:12.5px;font-weight:600}
+  .pg-send:hover{filter:brightness(1.08)}
+  .pg-result{border:1px solid var(--line);border-radius:6px;overflow:hidden;margin-top:6px}
+  .pg-result .rhead{display:flex;align-items:center;gap:8px;padding:8px 10px;font-size:12px;background:#f8fbff}
+  .pg-err{color:var(--red);font-size:12px;padding:10px;background:#fbe9ea;border-radius:6px}
+  .pg-effect{font-size:11.5px;color:var(--green);padding:6px 10px;background:#e6f4e6;border-radius:6px;margin-top:6px}
+
+  /* Backend diff view */
+  .diff{border:1px solid var(--line);border-radius:8px;margin-bottom:12px;overflow:hidden}
+  .diff-h{background:#fff7e6;border-bottom:1px solid #f0e2c0;padding:7px 10px;font-size:12px;font-weight:600;color:#8a6d00}
+  .diff-empty{padding:8px 10px;font-size:12px;color:var(--muted)}
+  .diff-row{display:flex;gap:8px;align-items:flex-start;padding:6px 10px;border-bottom:1px solid #f3f2f1;font-size:12px}
+  .diff-row:last-child{border-bottom:0}
+  .diff-badge{font-size:10px;font-weight:700;padding:1px 7px;border-radius:4px;color:#fff;white-space:nowrap;margin-top:1px}
+  .db-add{background:var(--green)} .db-mod{background:var(--amber)} .db-del{background:var(--red)}
+  .diff-row .dl{font-weight:600}
+  .diff-row .dd{color:var(--muted)}
+  .diff-row .dd code{background:#f3f2f1;padding:0 4px;border-radius:3px;color:var(--ink)}
+
+  /* Guided recipe playground */
+  .rc-select{width:100%;border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:13px;background:#fff}
+  .rc-label{font-size:11px;font-weight:700;color:var(--muted);margin:12px 0 4px;display:block;text-transform:uppercase;letter-spacing:.3px}
+  .rc-lock{font-weight:400;text-transform:none;letter-spacing:0;color:#8a6d00}
+  .rc-desc{font-size:12.5px;color:var(--ink);background:#f8fbff;border:1px solid #cfe2f5;border-radius:6px;padding:8px 10px;margin-top:6px}
+  .rc-field{margin-top:8px}
+  .rc-vlabel{font-size:12px;font-weight:600;margin-bottom:3px}
+  .rc-var-input{width:100%;border:1px solid #6fbf6f;border-left:4px solid var(--green);border-radius:6px;padding:8px 10px;font-size:13px;background:#f4fbf4}
+  .rc-var-input:focus{outline:2px solid #b7e2b7}
+  .rc-hint{font-size:11px;color:var(--muted);margin-top:3px}
+  .rc-consts{background:#f3f2f1;border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:11.5px;margin-top:10px}
+  .rc-consts-h{font-weight:700;color:#605e5c;margin-bottom:4px}
+  .rc-consts code{background:#fff;border:1px solid var(--line);padding:0 4px;border-radius:3px;color:var(--ink)}
+  .rc-cnote{color:var(--muted)}
+  .rc-code-head{display:flex;align-items:center;gap:8px;margin:12px 0 6px;flex-wrap:wrap}
+  .rc-toggle{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+  .rc-toggle button{border:none;background:#fff;padding:5px 10px;font-size:11px;color:var(--muted)}
+  .rc-toggle button.active{background:var(--accent);color:#fff;font-weight:600}
+  .rc-legend{display:flex;gap:16px;font-size:11px;color:var(--muted);margin-top:6px;flex-wrap:wrap}
+  .rc-legend .k{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:5px;vertical-align:middle}
+  .cvar{color:#7ee787;background:rgba(126,231,135,.15);border-radius:3px;padding:0 3px;font-weight:700}
+  .cconst{color:#e0b0a0;background:rgba(224,176,160,.13);border-radius:3px;padding:0 3px}
+  /* left-pane flash to show impact */
+  @keyframes flashbg{0%{background:#fff3bf;box-shadow:0 0 0 2px #ffd54a inset}100%{background:transparent;box-shadow:none}}
+  .row.flash,.cont.flash{animation:flashbg 1.9s ease-out}
+
+  /* Workflow pipeline */
+  .pipeline{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:10px 14px;margin-top:4px}
+  .pl-title{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;margin-bottom:8px}
+  .pl-track{display:flex;align-items:center;gap:2px;flex-wrap:wrap}
+  .pl-step{display:flex;align-items:center;gap:6px;opacity:.5}
+  .pl-step.active{opacity:1}.pl-step.done{opacity:.85}
+  .pl-dot{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:700;
+    background:#e1dfdd;color:#605e5c}
+  .pl-step.active .pl-dot{background:var(--accent);color:#fff;box-shadow:0 0 0 3px #cfe2f5}
+  .pl-step.done .pl-dot{background:var(--green);color:#fff}
+  .pl-lbl{font-size:12px;font-weight:600}
+  .pl-line{flex:1;height:2px;background:var(--line);min-width:10px}
+
+  /* Domain dashboard */
+  .dashboard{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:10px 14px}
+  .dash-h{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;margin-bottom:8px}
+  .dash-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .dash-cell{background:linear-gradient(135deg,#0f6cbd0d,#5c2e910d);border:1px solid var(--line);border-radius:7px;padding:9px 10px;text-align:center}
+  .dash-cell .dv{font-size:17px;font-weight:700;color:var(--ink)}
+  .dash-cell .dk{font-size:10.5px;color:var(--muted);margin-top:2px}
+  .dash-note{margin-top:8px;font-size:12px;color:var(--muted);background:#faf9f8;border:1px solid var(--line);border-radius:6px;padding:6px 9px}
+  @media(max-width:520px){.dash-grid{grid-template-columns:repeat(2,1fr)}}
+
+  /* Action panels (AI + security) */
+  .actpanel{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:10px 14px}
+  .actpanel.ai{border-left:4px solid #5c2e91}
+  .actpanel.security{border-left:4px solid #a4262c}
+  .actpanel.collab{border-left:4px solid #0f6cbd}
+  .ap-btn.collab:hover{border-color:#0f6cbd;color:#0f6cbd;background:#f2f8fd}
+  .ap-h{font-size:12.5px;font-weight:700;margin-bottom:2px}
+  .ap-sub{display:block;font-size:11px;font-weight:400;color:var(--muted);margin-top:1px}
+  .ap-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}
+  .ap-btn{border:1px solid var(--line);background:#fff;border-radius:6px;padding:7px 11px;font-size:12px;
+    display:inline-flex;align-items:center;gap:6px;color:var(--ink);transition:.12s}
+  .ap-btn.ai:hover{border-color:#5c2e91;color:#5c2e91;background:#f7f2fc}
+  .ap-btn.security:hover{border-color:#a4262c;color:#a4262c;background:#fdf5f5}
+  .ap-btn:disabled{opacity:.4;cursor:not-allowed}
+  .ap-ic{font-size:14px}
+  .airesult{border-radius:var(--radius);padding:0;overflow:hidden;border:1px solid var(--line)}
+  .airesult.ai{border-color:#d9c7ec} .airesult.security{border-color:#eccaca} .airesult.collab{border-color:#c3ddf2}
+  .ar-h{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;font-weight:700;font-size:12.5px}
+  .airesult.ai .ar-h{background:#f3ecfa;color:#5c2e91} .airesult.security .ar-h{background:#fbeaea;color:#a4262c}
+  .airesult.collab .ar-h{background:#eaf3fb;color:#0f6cbd}
+  .ar-body{padding:10px 12px;font-size:12.5px;line-height:1.55;color:var(--ink)}
+  .ar-body code,.dash-note code,.ap-sub code{background:#eef1f4;padding:0 4px;border-radius:3px;font-size:11.5px}
+
+  /* Toast + modal */
+  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#242424;color:#fff;
+    padding:9px 16px;border-radius:8px;font-size:12.5px;opacity:0;pointer-events:none;transition:.2s;z-index:50}
+  .toast.show{opacity:1}
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;place-items:center;z-index:40}
+  .modal-bg.show{display:grid}
+  .modal{background:#fff;border-radius:10px;padding:18px;width:min(420px,92vw);box-shadow:0 8px 30px rgba(0,0,0,.25)}
+  .modal h3{margin:0 0 4px} .modal p{margin:0 0 12px;color:var(--muted);font-size:12.5px}
+  .modal label{font-size:12px;font-weight:600;display:block;margin:8px 0 4px}
+  .modal input,.modal select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;font-size:13px}
+  .modal .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+  .foot{padding:6px 16px;border-top:1px solid var(--line);background:var(--panel);color:var(--muted);
+    font-size:11px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+  .foot b{color:var(--ink)}
+  @media(max-width:820px){.split{grid-template-columns:1fr;grid-template-rows:1fr 6px 1fr}.divider{cursor:row-resize}}
+  /* ===== App identity banner + collapsible SPE ops (shared chrome) ===== */
+  .appbanner{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:10px;margin-bottom:12px;
+    background:linear-gradient(135deg,color-mix(in srgb,var(--ac) 16%,#fff),color-mix(in srgb,var(--ac) 4%,#fff));
+    border:1px solid color-mix(in srgb,var(--ac) 35%,var(--line))}
+  .ab-icon{width:40px;height:40px;border-radius:10px;background:var(--ac);color:#fff;display:grid;place-items:center;font-size:20px;flex:0 0 auto}
+  .ab-name{font-weight:700;font-size:16px;display:flex;align-items:center;gap:8px}
+  .ab-ind{font-size:10.5px;font-weight:600;background:var(--ac);color:#fff;padding:1px 8px;border-radius:999px}
+  .ab-tag{font-size:12px;color:var(--muted)}
+  .ab-pill{margin-left:auto;font-size:10.5px;color:var(--ac);background:#fff;border:1px solid color-mix(in srgb,var(--ac) 40%,var(--line));
+    padding:3px 9px;border-radius:999px;font-weight:600;text-align:center;max-width:220px}
+  .speops{margin-top:14px;border:1px dashed var(--line);border-radius:8px;background:#fbfbfa}
+  .speops>summary{cursor:pointer;padding:9px 12px;font-size:12px;color:var(--muted);font-weight:600;list-style:none}
+  .speops>summary::-webkit-details-marker{display:none}
+  .speops>summary:before{content:"▸ ";color:var(--accent)}
+  .speops[open]>summary:before{content:"▾ "}
+  .speops-body{padding:6px 10px 10px;display:flex;flex-direction:column;gap:8px}
+  .vtoolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+  .roomsel{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+  .roomtab{border:1px solid var(--line);background:#fff;border-radius:8px;padding:7px 12px;font-size:12.5px;cursor:pointer;display:flex;gap:7px;align-items:center}
+  .roomtab.active{border-color:var(--ac);background:color-mix(in srgb,var(--ac) 8%,#fff);color:var(--ac);font-weight:600}
+  .chip{display:inline-block;font-size:10.5px;padding:2px 7px;border-radius:999px;background:#f3f2f1;color:var(--muted)}
+  .chip.g{background:#e6f4e6;color:#0e7a0b}.chip.a{background:#fdf3d6;color:#8a6d00}.chip.r{background:#fbe9ea;color:#a4262c}
+  .chip.b{background:#eef4fb;color:#0f6cbd}.chip.p{background:#f0e9f7;color:#5c2e91}
+  .mini{border:none;background:transparent;color:var(--ac);font-size:11.5px;cursor:pointer;padding:3px 7px;border-radius:5px;font-weight:600}
+  .mini:hover{background:color-mix(in srgb,var(--ac) 10%,#fff)}
+  .mini.solid{background:var(--ac);color:#fff}.mini.solid:hover{filter:brightness(1.08)}
+  .mini.ghost{border:1px solid var(--line);color:var(--ink)}
+
+  /* ===== 1. ClauseWorks — CLM Kanban board ===== */
+  .kanban{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(190px,1fr);gap:10px;overflow-x:auto;padding-bottom:6px}
+  .kcol{background:#f6f5f4;border:1px solid var(--line);border-radius:8px;padding:8px;min-height:120px}
+  .kcol-h{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--muted);margin-bottom:8px;display:flex;justify-content:space-between}
+  .kcard{background:#fff;border:1px solid var(--line);border-left:3px solid var(--ac);border-radius:7px;padding:9px;margin-bottom:8px;cursor:pointer}
+  .kcard.sel{box-shadow:0 0 0 2px color-mix(in srgb,var(--ac) 45%,#fff)}
+  .kcard .kt{font-weight:600;font-size:12.5px;margin-bottom:5px}
+  .kcard .kmeta{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px}
+  .kcard .kact{display:flex;gap:4px;flex-wrap:wrap;border-top:1px solid #f3f2f1;padding-top:6px}
+
+  /* ===== 2. DealVault — Data room ===== */
+  .barrier{background:#fff4ce;border:1px solid #f2d98c;color:#6b5900;border-radius:8px;padding:8px 11px;font-size:12px;margin-bottom:12px}
+  .lockrib{background:#fbe9ea;border:1px solid #eccaca;color:#a4262c;border-radius:8px;padding:7px 11px;font-size:12px;margin-bottom:12px;font-weight:600}
+  .vdr-table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .vdr-table th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.3px;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line);background:#faf9f8}
+  .vdr-table td{padding:9px 10px;border-bottom:1px solid #f3f2f1;font-size:12.5px;vertical-align:middle}
+  .vdr-table tr:last-child td{border-bottom:none}
+  .nodl{font-size:10.5px;color:#a4262c;border:1px solid #eccaca;border-radius:5px;padding:1px 6px}
+
+  /* ===== 3. TrialFile — EDL completeness matrix ===== */
+  .edl-top{display:flex;gap:16px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+  .ring{--p:0;width:84px;height:84px;border-radius:50%;flex:0 0 auto;
+    background:conic-gradient(var(--ac) calc(var(--p)*1%),#eceae9 0);display:grid;place-items:center}
+  .ring i{width:62px;height:62px;border-radius:50%;background:#fff;display:grid;place-items:center;font-weight:700;font-size:16px;font-style:normal}
+  .edl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+  .edl-tile{border:1px solid var(--line);border-radius:8px;padding:9px;background:#fff;border-left:4px solid #ccc}
+  .edl-tile.complete{border-left-color:#0e7a0b}.edl-tile.missing{border-left-color:#a4262c;background:#fdf5f5}
+  .edl-tile.pending{border-left-color:#8a6d00}
+  .edl-tile .z{font-size:10.5px;color:var(--muted)}.edl-tile .a{font-weight:600;font-size:12.5px;margin:2px 0 6px}
+
+  /* ===== 4. ClaimDesk — Adjuster workbench ===== */
+  .claimhdr{display:flex;gap:14px;align-items:center;background:#fff;border:1px solid var(--line);border-left:4px solid var(--ac);border-radius:9px;padding:12px 14px;margin-bottom:12px;flex-wrap:wrap}
+  .claimhdr .big{font-size:22px;font-weight:800;color:var(--ac)}
+  .cw-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:12px}
+  @media(max-width:640px){.cw-grid{grid-template-columns:1fr}}
+  .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
+  .gtile{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff}
+  .gthumb{height:64px;display:grid;place-items:center;font-size:24px;color:#fff}
+  .gtile .gc{padding:5px 6px;font-size:10.5px}
+  .copilot-card{background:linear-gradient(135deg,#f3ecfa,#fbf7ff);border:1px solid #d9c7ec;border-radius:9px;padding:12px}
+  .copilot-card h4{margin:0 0 6px;color:#5c2e91;font-size:13px}
+  .checklist{list-style:none;padding:0;margin:8px 0 0;font-size:12px}
+  .checklist li{padding:3px 0;color:var(--muted)}
+
+  /* ===== 5. BuildSet — Drawing register ===== */
+  .reg-table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:14px}
+  .reg-table th{text-align:left;font-size:10.5px;text-transform:uppercase;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line);background:#faf9f8}
+  .reg-table td{padding:9px 10px;border-bottom:1px solid #f3f2f1;font-size:12.5px}
+  .revchip{background:var(--ac);color:#fff;font-weight:700;font-size:11px;padding:2px 8px;border-radius:5px}
+  .section-h{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--muted);margin:4px 0 8px}
+  .rfi{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--line);border-radius:7px;padding:9px 11px;margin-bottom:6px}
+
+  /* ===== 6. BrandVault — Asset gallery ===== */
+  .assets{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+  .asset{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:#fff}
+  .asset .thumb{height:96px;display:grid;place-items:center;font-size:34px;color:#fff;position:relative}
+  .asset .abody{padding:8px}
+  .asset .an{font-weight:600;font-size:12px;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .asset .atags{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px}
+  .asset .aact{display:flex;gap:4px;border-top:1px solid #f3f2f1;padding-top:6px}
+  .expwarn{position:absolute;top:6px;right:6px;background:#a4262c;color:#fff;font-size:9.5px;padding:1px 6px;border-radius:999px}
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo">SPE</div>
+      <div>SharePoint Embedded — Interactive Sandbox
+        <small>Simulated Graph backend · zero setup · no sign-in required</small>
+      </div>
+    </div>
+    <div class="verticals" id="verticals"></div>
+  </div>
+
+  <div class="split" id="split">
+    <!-- LEFT: live app -->
+    <section class="pane" id="leftPane">
+      <div class="pane-head">
+        <h2 id="appTitle">App</h2>
+        <span class="sub" id="appSub"></span>
+        <button class="btn ghost" id="resetBtn" style="margin-left:auto">↺ Reset sandbox</button>
+        <span class="pill">LIVE UI</span>
+      </div>
+      <div class="app-body" id="appBody"></div>
+    </section>
+
+    <div class="divider" id="divider"></div>
+
+    <!-- RIGHT: developer view -->
+    <section class="pane" id="rightPane">
+      <div class="tabs">
+        <button class="tab active" data-tab="api">API Calls <span class="badge" id="apiCount">0</span></button>
+        <button class="tab" data-tab="backend">Backend Store</button>
+        <button class="tab" data-tab="code">Sample Code</button>
+        <button class="tab" data-tab="tryit">Try it 🧪</button>
+      </div>
+      <div class="tabpane active" data-pane="api" id="paneApi">
+        <div class="logbar">
+          <span class="sub" style="color:var(--muted);font-size:11.5px">Every action below issues a real Microsoft&nbsp;Graph request shape.</span>
+          <button class="btn ghost" id="clearLog">Clear log</button>
+        </div>
+        <div id="apiLog"><div class="empty">Interact with the app on the left to see Graph API calls appear here.</div></div>
+      </div>
+      <div class="tabpane" data-pane="backend" id="paneBackend"></div>
+      <div class="tabpane" data-pane="code" id="paneCode">
+        <div class="code-head"><span class="lang" id="codeLang">TypeScript · Microsoft Graph SDK</span>
+          <button class="copy" id="copyCode">Copy</button></div>
+        <pre id="codeBlock"><span class="tok-punc">// Trigger an action on the left to see the exact sample code here.</span></pre>
+        <p class="hint" id="codeHint"></p>
+      </div>
+      <div class="tabpane" data-pane="tryit" id="paneTryit"></div>
+    </section>
+  </div>
+
+  <div class="foot">
+    <span><b>Container type:</b> <span id="footCtype">—</span></span>
+    <span><b>Containers:</b> <span id="footConts">0</span></span>
+    <span><b>Files:</b> <span id="footFiles">0</span></span>
+    <span><b>API calls:</b> <span id="footCalls">0</span></span>
+    <span style="margin-left:auto">Simulated data only — nothing leaves your browser.</span>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="modal-bg" id="modalBg"><div class="modal" id="modal"></div></div>
+
+<script>
+"use strict";
+/* ============================================================================
+   1. SIMULATED SHAREPOINT EMBEDDED GRAPH ENGINE
+   Maintains an in-memory store and returns realistic Graph responses while
+   logging the request/response shape for each call.
+============================================================================ */
+const uid = (p) => p + "-" + Math.random().toString(36).slice(2,10);
+const nowISO = () => new Date().toISOString();
+const clone = (o) => JSON.parse(JSON.stringify(o));
+
+const Store = {
+  containerTypes:{}, containers:{}, items:{}, audit:[], calls:[]
+};
+
+function logCall(method,url,{query,body,status,response,note}={}){
+  const entry={id:uid("call"),ts:nowISO(),method,url,query:query||null,
+    body:body?clone(body):null,status:status||200,
+    response:response!==undefined?clone(response):null,note:note||null};
+  Store.calls.unshift(entry);
+  renderApiLog(); updateCounters();
+  return entry;
+}
+
+const Graph = {
+  registerContainerType(displayName){
+    const id="ct-"+Math.random().toString(36).slice(2,10);
+    Store.containerTypes[id]={id,displayName,owningAppId:uid("app"),createdDateTime:nowISO(),columns:[]};
+    return Store.containerTypes[id];
+  },
+  // POST /storage/fileStorage/containers
+  createContainer(containerTypeId,displayName,description){
+    const body={displayName,description:description||"",containerTypeId};
+    const c={id:"b!"+Math.random().toString(36).slice(2,14).toUpperCase(),
+      displayName,description:description||"",containerTypeId,status:"active",
+      createdDateTime:nowISO(),customProperties:{},columns:[]};
+    Store.containers[c.id]=c; Store.items[c.id]={};
+    const resp={id:c.id,displayName:c.displayName,containerTypeId,status:"active",createdDateTime:c.createdDateTime};
+    logCall("POST","/storage/fileStorage/containers",{body,status:201,response:resp,
+      note:"Provisions a new SPE container (a dedicated document store) of the given container type."});
+    audit("ContainerCreated",c.id,displayName);
+    return c;
+  },
+  // GET containers
+  listContainers(containerTypeId){
+    const list=Object.values(Store.containers).filter(c=>c.containerTypeId===containerTypeId)
+      .map(c=>({id:c.id,displayName:c.displayName,createdDateTime:c.createdDateTime}));
+    logCall("GET","/storage/fileStorage/containers",{query:`$filter=containerTypeId eq ${containerTypeId}`,
+      status:200,response:{value:list}});
+    return list;
+  },
+  // POST columns on a container
+  addColumns(containerId,columns){
+    const c=Store.containers[containerId];
+    columns.forEach(col=>{ if(!c.columns.find(x=>x.name===col.name)) c.columns.push(col); });
+    logCall("POST",`/storage/fileStorage/containers/${short(containerId)}/columns`,
+      {body:columns.length===1?columns[0]:{requests:columns},status:201,
+       response:{value:columns.map(col=>({id:uid("col"),...col}))},
+       note:"Defines typed metadata columns on the container so documents can be tagged & queried."});
+    return c.columns;
+  },
+  // PUT file content
+  uploadFile(containerId,parentId,name,{size,columns,contentType}={}){
+    const it={id:uid("item"),name,parentId:parentId||"root",folder:false,
+      file:{mimeType:contentType||mimeFor(name),hashes:{quickXorHash:uid("hash")}},
+      size:size||(40+Math.floor(Math.random()*900))*1024,columns:columns||{},
+      versions:[{id:"1.0",lastModifiedDateTime:nowISO(),size:size||120000}],
+      createdDateTime:nowISO(),lastModifiedDateTime:nowISO()};
+    Store.items[containerId][it.id]=it;
+    const path=itemPath(containerId,parentId);
+    const resp={id:it.id,name:it.name,size:it.size,file:it.file,
+      "@microsoft.graph.downloadUrl":"https://…/download",createdDateTime:it.createdDateTime};
+    logCall("PUT",`/drives/${short(containerId)}/root:${path}${name}:/content`,
+      {body:"<binary file bytes>",status:201,response:resp,
+       note:"Uploads document bytes into the container's drive (small-file simple upload)."});
+    audit("FileUploaded",containerId,name);
+    if(columns&&Object.keys(columns).length) this.setItemColumns(containerId,it.id,columns,true);
+    return it;
+  },
+  // POST create folder
+  createFolder(containerId,parentId,name){
+    const it={id:uid("item"),name,parentId:parentId||"root",folder:true,size:0,
+      columns:{},versions:[],createdDateTime:nowISO()};
+    Store.items[containerId][it.id]=it;
+    logCall("POST",`/drives/${short(containerId)}/items/${parentId||"root"}/children`,
+      {body:{name,folder:{},"@microsoft.graph.conflictBehavior":"rename"},status:201,
+       response:{id:it.id,name,folder:{childCount:0}},
+       note:"Creates a folder inside the container drive to structure documents."});
+    return it;
+  },
+  listChildren(containerId,parentId){
+    const kids=Object.values(Store.items[containerId]||{}).filter(i=>(i.parentId||"root")===(parentId||"root"));
+    logCall("GET",`/drives/${short(containerId)}/items/${parentId||"root"}/children`,
+      {status:200,response:{value:kids.map(k=>({id:k.id,name:k.name,size:k.size,
+        folder:k.folder?{}:undefined,file:k.folder?undefined:k.file}))}});
+    return kids;
+  },
+  // PATCH item metadata columns (listItem fields)
+  setItemColumns(containerId,itemId,fields,silent){
+    const it=Store.items[containerId][itemId];
+    it.columns=Object.assign(it.columns||{},fields);
+    if(!silent) logCall("PATCH",`/drives/${short(containerId)}/items/${itemId}/listItem/fields`,
+      {body:fields,status:200,response:Object.assign({id:itemId},it.columns),
+       note:"Sets metadata column values on the document's list item."});
+    audit("MetadataUpdated",containerId,it.name);
+    return it.columns;
+  },
+  // new file version
+  addVersion(containerId,itemId){
+    const it=Store.items[containerId][itemId];
+    const n=it.versions.length+1; const v=n+".0";
+    it.versions.push({id:v,lastModifiedDateTime:nowISO(),size:it.size+((Math.random()*40)|0)*1024});
+    it.lastModifiedDateTime=nowISO();
+    logCall("PUT",`/drives/${short(containerId)}/root:${itemPath(containerId,it.parentId)}${it.name}:/content`,
+      {body:"<updated binary bytes>",status:200,
+       response:{id:itemId,name:it.name,cTag:uid("ctag")},
+       note:"Uploading new bytes to an existing item creates a new version automatically."});
+    audit("VersionCreated",containerId,it.name+" v"+v);
+    return it;
+  },
+  listVersions(containerId,itemId){
+    const it=Store.items[containerId][itemId];
+    logCall("GET",`/drives/${short(containerId)}/items/${itemId}/versions`,
+      {status:200,response:{value:it.versions.map(v=>({id:v.id,size:v.size,
+        lastModifiedDateTime:v.lastModifiedDateTime}))}});
+    return it.versions;
+  },
+  // createLink (sharing)
+  createShareLink(containerId,itemId,type,scope){
+    const it=Store.items[containerId][itemId];
+    const link="https://contoso.sharepoint.com/:w:/r/"+uid("share");
+    logCall("POST",`/drives/${short(containerId)}/items/${itemId}/createLink`,
+      {body:{type,scope},status:201,
+       response:{link:{type,scope,webUrl:link},roles:[type==="edit"?"write":"read"]},
+       note:"Generates a shareable link (co-authoring/preview) honoring container permissions."});
+    it.shared={type,scope,link}; audit("LinkShared",containerId,it.name);
+    return link;
+  },
+  // search across containers of a type
+  search(containerTypeId,queryString){
+    const hits=[];
+    Object.values(Store.containers).filter(c=>c.containerTypeId===containerTypeId).forEach(c=>{
+      Object.values(Store.items[c.id]||{}).forEach(it=>{
+        if(!it.folder && (it.name.toLowerCase().includes(queryString.toLowerCase())
+           || JSON.stringify(it.columns).toLowerCase().includes(queryString.toLowerCase())))
+          hits.push({container:c.displayName,containerId:c.id,name:it.name,columns:it.columns});
+      });
+    });
+    logCall("POST","/search/query",
+      {body:{requests:[{entityTypes:["driveItem"],
+        query:{queryString:`${queryString}`},
+        sharePointOneDriveOptions:{includeHiddenContent:true}}]},
+       status:200,response:{hitsContainers:[{total:hits.length,
+         hits:hits.slice(0,8).map(h=>({resource:{name:h.name,parentReference:{name:h.container}}}))}]},
+       note:"Full-text + metadata search spanning every container of this app's container type."});
+    return hits;
+  },
+  setRetention(containerId,itemId,label,years){
+    const it=Store.items[containerId][itemId];
+    it.retentionLabel={name:label,retainYears:years,appliedDateTime:nowISO()};
+    logCall("PATCH",`/drives/${short(containerId)}/items/${itemId}/retentionLabel`,
+      {body:{name:label,retentionSettings:{behaviorDuringRetentionPeriod:"retain",
+        isRecordLocked:true}},status:200,
+       response:{name:label,isLabelAppliedExplicitly:true,retentionSettings:{isRecordLocked:true}},
+       note:"Applies a Microsoft Purview retention label — the record is now locked from deletion."});
+    audit("RetentionApplied",containerId,it.name+" · "+label);
+    return it.retentionLabel;
+  },
+  legalHold(containerId,on){
+    const c=Store.containers[containerId];
+    c.legalHold=on;
+    logCall("PATCH",`/storage/fileStorage/containers/${short(containerId)}`,
+      {body:{customProperties:{legalHold:{value:String(on),isSearchable:true}}},status:200,
+       response:{id:c.id,customProperties:{legalHold:{value:String(on)}}},
+       note:on?"Places the entire matter container on legal hold (eDiscovery preservation).":
+              "Releases the legal hold on the container."});
+    audit(on?"LegalHoldPlaced":"LegalHoldReleased",containerId,c.displayName);
+    return on;
+  },
+  // eDiscovery-style export
+  exportSet(containerTypeId,queryString){
+    const items=[];
+    Object.values(Store.containers).filter(c=>c.containerTypeId===containerTypeId).forEach(c=>{
+      Object.values(Store.items[c.id]||{}).filter(i=>!i.folder).forEach(i=>items.push(i));
+    });
+    logCall("POST","/security/cases/ediscoveryCases/{id}/searches",
+      {body:{displayName:"FOIA export — "+queryString,contentQuery:queryString},status:201,
+       response:{id:uid("search"),displayName:"FOIA export",lastEstimateStatusChangeDateTime:nowISO(),
+         status:"succeeded"},
+       note:"Creates an eDiscovery search to compile a defensible export package for a records request."});
+    return items.length;
+  },
+  // approval workflow (custom property state machine)
+  setApprovalState(containerId,itemId,state,actor){
+    const it=Store.items[containerId][itemId];
+    it.columns=Object.assign(it.columns||{},{ApprovalStatus:state});
+    logCall("PATCH",`/drives/${short(containerId)}/items/${itemId}/listItem/fields`,
+      {body:{ApprovalStatus:state,ApprovedBy:actor,ApprovedDateTime:nowISO()},status:200,
+       response:{ApprovalStatus:state,ApprovedBy:actor},
+       note:"Advances the engineering-change approval workflow via the item's metadata columns."});
+    audit("Approval:"+state,containerId,it.name);
+    return state;
+  },
+  // ---- Copilot / AI grounded on container content ----
+  copilotRetrieval(containerId,prompt,itemName){
+    const c=Store.containers[containerId];
+    logCall("POST","/copilot/retrieval",
+      {body:{queryString:prompt,
+         dataSource:{sharePointEmbedded:{containerId:c.id}},
+         resourceMetadata:["title","author"],maximumNumberOfResults:5},status:200,
+       response:{retrievalHits:[{webUrl:"https://…/"+(itemName||"doc"),
+         extracts:[{text:"…grounded passage extracted from "+(itemName||"container content")+"…"}],
+         resourceMetadata:{title:itemName||c.displayName}}]},
+       note:"Copilot retrieval API grounds an AI answer ONLY on this container's content (tenant-secure RAG)."});
+    audit("CopilotGrounded",containerId,prompt.slice(0,42));
+    return true;
+  },
+  // ---- assign a sensitivity label (Purview / MIP) ----
+  assignSensitivity(containerId,itemId,label){
+    const it=Store.items[containerId][itemId];
+    it.sensitivity=label;
+    logCall("POST",`/drives/${short(containerId)}/items/${itemId}/assignSensitivityLabel`,
+      {body:{sensitivityLabelId:label,assignmentMethod:"standard"},status:202,
+       response:{status:"accepted"},
+       note:"Applies a Microsoft Purview sensitivity label — drives encryption + DLP on the document."});
+    audit("SensitivityLabelled",containerId,it.name+" · "+label);
+    return label;
+  },
+  // ---- grant a scoped permission on the container ----
+  addContainerPermission(containerId,role,principal){
+    const c=Store.containers[containerId];
+    (c.permissions=c.permissions||[]).push({role,principal});
+    logCall("POST",`/storage/fileStorage/containers/${short(containerId)}/permissions`,
+      {body:{roles:[role],grantedToV2:{user:{userPrincipalName:principal}}},status:201,
+       response:{id:uid("perm"),roles:[role],grantedToV2:{user:{displayName:principal}}},
+       note:"Grants a scoped role on the container — enforces least-privilege access (security boundary)."});
+    audit("PermissionGranted",containerId,role+" → "+principal);
+    return true;
+  },
+  // ---- advance a workflow stage (metadata state machine) ----
+  setStage(containerId,itemId,stage){
+    const it=Store.items[containerId][itemId];
+    it.columns=Object.assign(it.columns||{},{Stage:stage});
+    logCall("PATCH",`/drives/${short(containerId)}/items/${itemId}/listItem/fields`,
+      {body:{Stage:stage},status:200,response:{Stage:stage},
+       note:"Advances the business workflow by updating the document's Stage column."});
+    audit("Stage:"+stage,containerId,it.name);
+    return stage;
+  },
+  // ---- large-file upload session ----
+  createUploadSession(containerId,parentId,name,sizeMB){
+    logCall("POST",`/drives/${short(containerId)}/items/${parentId||"root"}:/${name}:/createUploadSession`,
+      {body:{item:{"@microsoft.graph.conflictBehavior":"replace",name}},status:200,
+       response:{uploadUrl:"https://…/_api/v2.0/…/uploadSession",expirationDateTime:nowISO(),
+         nextExpectedRanges:["0-"]},
+       note:"Opens a resumable upload session for a large file — the app then PUTs byte ranges to uploadUrl."});
+    const it=Graph.uploadFile(containerId,parentId,name,{size:(sizeMB||50)*1024*1024,silentLog:true});
+    audit("LargeUpload",containerId,name+" ("+(sizeMB||50)+" MB)");
+    return it;
+  },
+  // ---- WOPI preview (view-only, no download) ----
+  previewItem(containerId,itemId){
+    const it=Store.items[containerId][itemId];
+    logCall("POST",`/drives/${short(containerId)}/items/${itemId}/preview`,
+      {body:{},status:200,response:{getUrl:"https://…/_layouts/15/embed.aspx?UniqueId=…",
+        postUrl:null,postParameters:null},
+       note:"Returns a short-lived WOPI embed URL — renders in-browser as the caller, no bytes downloaded (safe for PII/PHI/VDR)."});
+    audit("PreviewOnly",containerId,it.name);
+    return it;
+  },
+  // ---- item-level invite (share one file, e.g. external party) ----
+  inviteItem(containerId,itemId,email,role){
+    const it=Store.items[containerId][itemId];
+    (it.invites=it.invites||[]).push({email,role});
+    logCall("POST",`/drives/${short(containerId)}/items/${itemId}/invite`,
+      {body:{recipients:[{email}],roles:[role||"read"],requireSignIn:true,sendInvitation:true},status:200,
+       response:{value:[{grantedToV2:{user:{email}},roles:[role||"read"]}]},
+       note:"Grants access to a SINGLE item (not the whole container) — e.g. share one draft with outside counsel."});
+    audit("ItemInvite",containerId,email+" → "+it.name);
+    return it;
+  },
+  // ---- container lock / unlock (WORM immutability) ----
+  lockContainer(containerId,on){
+    const c=Store.containers[containerId]; c.locked=on;
+    logCall("POST",`/storage/fileStorage/containers/${short(containerId)}/${on?"lock":"unlock"}`,
+      {body:on?{mode:"full"}:{},status:200,response:{id:c.id,lockState:on?"locked":"unlocked"},
+       note:on?"Locks the container read-only (WORM) — supports SEC 17a-4 / records immutability.":"Unlocks the container."});
+    audit(on?"ContainerLocked":"ContainerUnlocked",containerId,c.displayName);
+    return on;
+  },
+  // ---- copy an item into an archive/closing-binder container ----
+  copyItem(containerId,itemId,destName){
+    const it=Store.items[containerId][itemId];
+    logCall("POST",`/drives/${short(containerId)}/items/${itemId}/copy`,
+      {body:{name:destName||it.name,parentReference:{driveId:"{archiveDriveId}"}},status:202,
+       response:{},note:"Async copy into an archive / closing-binder container (202 Accepted + monitor URL)."});
+    audit("Copied",containerId,it.name+" → archive");
+    return it;
+  },
+  // ---- change notifications + delta (event-driven ingestion) ----
+  createSubscription(containerId){
+    const c=Store.containers[containerId]; c.subscribed=true;
+    logCall("POST","/subscriptions",
+      {body:{changeType:"updated",notificationUrl:"https://app/webhook",
+        resource:`/drives/${short(containerId)}/root`,expirationDateTime:nowISO()},status:201,
+       response:{id:uid("sub"),resource:`/drives/${short(containerId)}/root`,changeType:"updated"},
+       note:"Subscribes to drive changes; on each webhook the app calls /root/delta to process new/changed items."});
+    logCall("GET",`/drives/${short(containerId)}/root/delta`,{status:200,
+      response:{value:Object.values(Store.items[c.id]).filter(i=>!i.folder).slice(0,3).map(i=>({id:i.id,name:i.name})),
+        "@odata.deltaLink":"https://…/delta?token=…"},
+      note:"Delta query returns just what changed since the last token — the event-driven ingestion loop."});
+    audit("Subscribed",containerId,c.displayName);
+    return true;
+  },
+  // ---- thumbnails (media grid) ----
+  getThumbnails(containerId,itemId){
+    const it=Store.items[containerId][itemId];
+    logCall("GET",`/drives/${short(containerId)}/items/${itemId}/thumbnails`,{status:200,
+      response:{value:[{id:"0",large:{width:800,height:600,url:"https://…/thumb_large.jpg"},
+        medium:{width:176,height:176,url:"https://…/thumb_med.jpg"}}]},
+      note:"Fetches server-generated thumbnails/renditions for large media — powers the DAM grid."});
+    return it;
+  }
+};
+
+function audit(action,containerId,detail){
+  Store.audit.unshift({ts:nowISO(),action,containerId,detail});
+}
+const short=(id)=>id.replace(/^b!/,"").slice(0,10);
+function mimeFor(name){const e=name.split(".").pop().toLowerCase();
+  return ({docx:"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    xlsx:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    pptx:"application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    pdf:"application/pdf",dwg:"image/vnd.dwg",step:"model/step"}[e])||"application/octet-stream";}
+function itemPath(containerId,parentId){
+  if(!parentId||parentId==="root") return "/";
+  const chain=[]; let cur=Store.items[containerId][parentId];
+  while(cur){chain.unshift(cur.name);cur=cur.parentId&&cur.parentId!=="root"?Store.items[containerId][cur.parentId]:null;}
+  return "/"+chain.join("/")+"/";
+}
+</script>
+
+<script>
+/* ============================================================================
+   2. FIVE DISTINCT END-TO-END INDUSTRY SCENARIOS
+   Each app models a different real workflow (not just document storage) and
+   exercises SPE STORAGE + COLLABORATION + SECURITY + COPILOT AI, with a
+   vertical-specific domain dashboard and nuance.
+============================================================================ */
+const money=(n)=>"$"+Number(n).toLocaleString();
+const numCol=(it,k)=>parseFloat((it.columns&&it.columns[k])||0)||0;
+function focusFile(container){ if(!container) return null;
+  return Object.values(Store.items[container.id]).filter(i=>!i.folder)[0]||null; }
+function aiWrite(container,item,prompt,fields,title,body){
+  Graph.copilotRetrieval(container.id,prompt,item?item.name:null);
+  if(item&&fields) Graph.setItemColumns(container.id,item.id,fields);
+  return {title,body};
+}
+
+const SCENARIOS = {
+  /* ================= App 1 — LEGAL: Contract Lifecycle Mgmt ================= */
+  legal:{
+    key:"legal", label:"Legal — CLM", color:"#5c2e91",
+    app:"ClauseWorks", tagline:"Contract lifecycle: request → draft → review → negotiate → sign → renew",
+    leads:"Office co-authoring (WXP) + Copilot",
+    capability:"Word co-authoring & auto-versioning · ethical-wall permissions · Copilot Retrieval",
+    containerType:"Matter Workspace",
+    term:{container:"Matter",containers:"Matters",newContainer:"New contract request",doc:"draft"},
+    pipeline:["Request","Draft","Review","Negotiate","Sign","Renew"],
+    columns:[{name:"Stage",text:{}},{name:"Counterparty",text:{}},{name:"Value",text:{}},{name:"GoverningLaw",text:{}},{name:"Status",text:{}},{name:"RenewalDate",text:{}}],
+    docKinds:["MSA.docx","NDA.docx","SOW.docx","Amendment.docx","Executed.pdf"],
+    rowActions:["stage","coauthor"], hasSearch:true, hasContainerHold:true, hasRetention:true, hasInvite:true,
+    seed(){
+      const c1=Graph.createContainer(this.ctId,"Globex Master Services Agreement","Vendor MSA matter");
+      Graph.addColumns(c1.id,this.columns);
+      Graph.uploadFile(c1.id,"root","MSA.docx",{columns:{Stage:"Negotiate",Counterparty:"Globex",Value:"480000",GoverningLaw:"NY",Status:"Flagged",RenewalDate:"2026-12-01"}});
+      Graph.addVersion(c1.id,Object.values(Store.items[c1.id])[0].id);
+      Graph.uploadFile(c1.id,"root","Redline-v2.docx",{columns:{Stage:"Review",Counterparty:"Globex",Value:"480000",GoverningLaw:"NY",Status:"In review",RenewalDate:"2026-12-01"}});
+      const c2=Graph.createContainer(this.ctId,"Initech Mutual NDA","Mutual NDA matter");
+      Graph.addColumns(c2.id,this.columns);
+      Graph.uploadFile(c2.id,"root","NDA.docx",{columns:{Stage:"Sign",Counterparty:"Initech",Value:"0",GoverningLaw:"DE",Status:"Standard",RenewalDate:"2027-02-15"}});
+      const c3=Graph.createContainer(this.ctId,"Umbrella SaaS Renewal","Renewal matter");
+      Graph.addColumns(c3.id,this.columns);
+      Graph.uploadFile(c3.id,"root","SaaS-Agreement.docx",{columns:{Stage:"Renew",Counterparty:"Umbrella",Value:"120000",GoverningLaw:"CA",Status:"Standard",RenewalDate:"2026-10-05"}});
+    },
+    badges:it=>{const b=[];const col=it.columns||{};
+      if(col.Stage)b.push({t:col.Stage,c:"blue"});
+      if(col.Counterparty)b.push({t:col.Counterparty,c:""});
+      if(col.Status)b.push({t:col.Status,c:col.Status==="Flagged"?"red":col.Status==="Standard"?"green":"amber"});
+      if(col.RenewalDate)b.push({t:"⏰ "+col.RenewalDate,c:"purple"});
+      if(it.invites&&it.invites.length)b.push({t:"📨 outside counsel",c:"green"});
+      if(it.sensitivity)b.push({t:"🛡 "+it.sensitivity,c:"red"});
+      if(it.versions&&it.versions.length>1)b.push({t:"v"+it.versions[it.versions.length-1].id,c:"purple"});
+      return b;},
+    dashboard(c){const f=Object.values(Store.items[c.id]).filter(i=>!i.folder);
+      const flagged=f.filter(x=>(x.columns||{}).Status==="Flagged").length;
+      const ren=f.filter(x=>(x.columns||{}).RenewalDate).map(x=>x.columns.RenewalDate);
+      const stage=(f[0]&&(f[0].columns||{}).Stage)||"Request";
+      return statGrid([["Drafts",f.length],["Flagged clauses",flagged],["Renewals tracked",ren.length],["Stage",stage]])
+        +(ren.length?`<div class="dash-note">⏰ Renewal dates: ${ren.join(" · ")}</div>`:"")
+        +(c.legalHold?`<div class="dash-note" style="color:var(--red)">⚖ Matter on legal hold — preserved for eDiscovery.</div>`:"");},
+    collab:[
+      {id:"coauthor",icon:"✍",label:"Co-author draft in Word",run:(c,it)=>{Graph.createShareLink(c.id,it.id,"edit","organization");
+        return{title:"Co-authoring in Word for the web",body:"Opened the draft via its <code>webUrl</code> for live redlining. Every save auto-versions — no Office integration to build."};}},
+      {id:"rev",icon:"⟳",label:"Save redline revision",run:(c,it)=>{Graph.addVersion(c.id,it.id);
+        return{title:"Revision saved",body:"Office files version automatically; the full redline history is preserved and restorable."};}},
+      {id:"invite",icon:"📨",label:"Share this draft with outside counsel",run:(c,it)=>{Graph.inviteItem(c.id,it.id,"counsel@external-law.com","write");
+        return{title:"Item-level share",body:"Outside counsel can edit <b>this draft only</b> — not the whole matter (item invite, not container permission)."};}}
+    ],
+    ai:[
+      {id:"oblig",icon:"⚖",label:"Extract obligations, flag indemnity",run:(c,it)=>aiWrite(c,it,
+        "Extract obligations and key dates; flag non-standard indemnity and uncapped liability.",
+        {Status:"Flagged",RenewalDate:"2026-12-01"},"Obligations extracted",
+        "Flagged <b>uncapped indemnity</b> and auto-renew 2026-12-01. Grounded via the Copilot Retrieval API — no external vector DB.")},
+      {id:"similar",icon:"🔎",label:"Find similar clauses in prior matters",run:(c,it)=>aiWrite(c,it,
+        "Find similar limitation-of-liability clauses across our prior executed contracts.",null,"Similar clauses",
+        "3 comparable liability caps found (12-mo fees). Retrieval is permission-trimmed to matters you can see.")},
+      {id:"gc",icon:"📝",label:"Summarize for General Counsel",run:(c,it)=>aiWrite(c,it,
+        "Summarize key terms, risks and recommended positions for the GC.",null,"GC summary",
+        "Vendor MSA, 3-yr term. Risks: liability cap, IP assignment. Recommend cap at 12-mo fees before the Sign gate.")}
+    ],
+    security:[
+      {id:"wall",icon:"🧱",label:"Apply ethical wall (deal team only)",scope:"container",run:(c,it)=>{Graph.addContainerPermission(c.id,"writer","deal-team@firm.com");
+        return{title:"Ethical wall set",body:"Container permissions restrict the matter to the deal team; item grants can't widen it."};}},
+      {id:"priv",icon:"🛡",label:"Label 'Attorney–Client Privileged'",run:(c,it)=>{Graph.assignSensitivity(c.id,it.id,"Attorney–Client Privileged");
+        return{title:"Privilege label applied",body:"Encrypted & DLP-protected; privilege travels with the document."};}},
+      {id:"hold",icon:"⚖",label:"Legal hold + 10-yr retention",scope:"container",run:(c,it)=>{Graph.legalHold(c.id,true);if(it)Graph.setRetention(c.id,it.id,"Executed Contract — 10 yr",10);
+        return{title:"Hold + retention",body:"Matter preserved for eDiscovery; executed contract retained 10 years via Purview."};}}
+    ]
+  },
+
+  /* ============ App 2 — FINANCIAL SERVICES: M&A Virtual Data Room ============ */
+  finance:{
+    key:"finance", label:"Financial — M&A VDR", color:"#0f6cbd",
+    app:"DealVault", tagline:"M&A due-diligence data room: index → segregated bidder rooms → Q&A → close",
+    leads:"Compliance & Security + audit",
+    capability:"Container-per-bidder isolation · WOPI preview-only (no download) · container lock (17a-4)",
+    containerType:"Deal / Bidder Room",
+    term:{container:"Room",containers:"Rooms",newContainer:"New bidder room",doc:"document"},
+    pipeline:["Setup","Index","Bidder Access","Q&A","Close"],
+    columns:[{name:"Stage",text:{}},{name:"DiligenceCategory",text:{}},{name:"ConfTier",text:{}},{name:"Bidder",text:{}},{name:"ViewOnly",text:{}}],
+    docKinds:["Financials.xlsx","Contracts.pdf","Model.xlsx","CIM.pdf","Cap-Table.xlsx"],
+    rowActions:["stage"], hasRetention:true, hasLock:true, hasPreview:true, hasUploadSession:true,
+    seed(){
+      const c1=Graph.createContainer(this.ctId,"Project Atlas — Master Index","Sell-side deal master");
+      Graph.addColumns(c1.id,this.columns);
+      Graph.uploadFile(c1.id,"root","CIM.pdf",{columns:{Stage:"Index",DiligenceCategory:"Overview",ConfTier:"High",Bidder:"—",ViewOnly:"No"}});
+      Graph.uploadFile(c1.id,"root","Financials.xlsx",{columns:{Stage:"Index",DiligenceCategory:"Financials",ConfTier:"High",Bidder:"—",ViewOnly:"No"}});
+      const c2=Graph.createContainer(this.ctId,"Atlas — Bidder A Room","Segregated bidder view");
+      Graph.addColumns(c2.id,this.columns);
+      Graph.addContainerPermission(c2.id,"reader","bidderA@acquirer.com");
+      Graph.uploadFile(c2.id,"root","Contracts.pdf",{columns:{Stage:"Bidder Access",DiligenceCategory:"Legal",ConfTier:"High",Bidder:"Bidder A",ViewOnly:"Yes"}});
+      const c3=Graph.createContainer(this.ctId,"Atlas — Bidder B Room","Segregated bidder view");
+      Graph.addColumns(c3.id,this.columns);
+      Graph.addContainerPermission(c3.id,"reader","bidderB@fund.com");
+      Graph.uploadFile(c3.id,"root","Model.xlsx",{columns:{Stage:"Bidder Access",DiligenceCategory:"Financials",ConfTier:"High",Bidder:"Bidder B",ViewOnly:"Yes"}});
+    },
+    badges:it=>{const b=[];const col=it.columns||{};
+      if(col.Stage)b.push({t:col.Stage,c:"blue"});
+      if(col.DiligenceCategory)b.push({t:col.DiligenceCategory,c:""});
+      if(col.Bidder&&col.Bidder!=="—")b.push({t:col.Bidder,c:"purple"});
+      if(col.ViewOnly==="Yes")b.push({t:"👁 view-only",c:"amber"});
+      if(it.sensitivity)b.push({t:"🛡 "+it.sensitivity,c:"red"});
+      return b;},
+    dashboard(c){const f=Object.values(Store.items[c.id]).filter(i=>!i.folder);
+      const vo=f.filter(x=>(x.columns||{}).ViewOnly==="Yes").length;
+      const rooms=Object.values(Store.containers).filter(x=>x.containerTypeId===SCENARIOS.finance.ctId&&/Bidder/.test(x.displayName)).length;
+      const stage=(f[0]&&(f[0].columns||{}).Stage)||"Setup";
+      return statGrid([["Documents",f.length],["Bidder rooms",rooms],["View-only docs",vo],["Container",c.locked?"🔒 Locked":"Unlocked"]])
+        +`<div class="dash-note">Each bidder gets its <b>own container</b> — the cleanest information barrier. Bidder A can't see Bidder B.</div>`;},
+    collab:[
+      {id:"bulk",icon:"⬆",label:"Bulk-upload financials (large file)",scope:"container",run:(c,it)=>{Graph.createUploadSession(c.id,"root","Data-Tape.xlsx",180);
+        return{title:"Large upload session",body:"Opened a resumable <code>createUploadSession</code> and streamed a 180 MB data tape in byte ranges."};}},
+      {id:"preview",icon:"👁",label:"Open document preview (no download)",run:(c,it)=>{Graph.previewItem(c.id,it.id);
+        return{title:"View-only preview (WOPI)",body:"Rendered in-browser via a short-lived embed URL. Bytes never leave the tenant — bidders can read, not download."};}},
+      {id:"binder",icon:"🗂",label:"Copy to closing binder / archive",run:(c,it)=>{Graph.copyItem(c.id,it.id,"ClosingBinder-"+it.name);
+        return{title:"Copied to archive",body:"Async copy into the post-close archive container for long-term retention."};}}
+    ],
+    ai:[
+      {id:"contracts",icon:"📑",label:"Summarize target's customer contracts",run:(c,it)=>aiWrite(c,it,
+        "Summarize the target's key customer contracts and total contract value.",null,"Contract summary",
+        "Top 5 customers = 62% of revenue; 2 contracts expire within 12 months. Grounded only on this bidder's room.")},
+      {id:"coc",icon:"🔗",label:"Find change-of-control clauses",run:(c,it)=>aiWrite(c,it,
+        "Identify change-of-control and assignment clauses across the diligence set.",
+        {ConfTier:"High"},"Change-of-control scan",
+        "4 contracts contain change-of-control consent rights — a deal-structuring risk. Retrieval is trimmed to this room.")},
+      {id:"qa",icon:"💬",label:"Draft Q&A answer from the index",run:(c,it)=>aiWrite(c,it,
+        "Answer the bidder question using only the master index documents.",null,"Q&A draft",
+        "Drafted a grounded answer citing the CIM and financials for sell-side review before release.")}
+    ],
+    security:[
+      {id:"isolate",icon:"🚧",label:"Grant this room to one bidder only",scope:"container",run:(c,it)=>{Graph.addContainerPermission(c.id,"reader","bidder@acquirer.com");
+        return{title:"Bidder isolation",body:"Only this bidder is granted reader on this container — a per-party information barrier."};}},
+      {id:"lock",icon:"🔒",label:"Lock room (17a-4 immutability)",scope:"container",run:(c,it)=>{Graph.lockContainer(c.id,true);
+        return{title:"Container locked (WORM)",body:"Read-only immutable state supports SEC Rule 17a-4 / records retention."};}},
+      {id:"ret",icon:"🛡",label:"Apply retention + sensitivity",run:(c,it)=>{Graph.assignSensitivity(c.id,it.id,"Highly Confidential — Deal");if(it)Graph.setRetention(c.id,it.id,"Broker-Dealer Record — 6 yr",6);
+        return{title:"Retention + label",body:"Retained ≥6 years and labelled; controls are the client's own Purview boundary."};}}
+    ]
+  },
+
+  /* =============== App 3 — HEALTHCARE / LIFE SCIENCES: eTMF =============== */
+  healthcare:{
+    key:"healthcare", label:"Healthcare — eTMF", color:"#0e7a0b",
+    app:"TrialFile", tagline:"Electronic Trial Master File: EDL setup → collection → QC → inspection → archive",
+    leads:"Compliance / Purview (21 CFR Part 11)",
+    capability:"Regulated taxonomy in columns · audit-by-versioning · sensitivity/retention · TMF transfer",
+    containerType:"Study / Site TMF",
+    term:{container:"Study",containers:"Studies",newContainer:"New study / site",doc:"essential document"},
+    pipeline:["Startup","Collection","QC","Approval","Inspection","Archive"],
+    columns:[{name:"Stage",text:{}},{name:"Zone",text:{}},{name:"Artifact",text:{}},{name:"EdlStatus",text:{}},{name:"QcStatus",text:{}}],
+    docKinds:["Protocol.pdf","ICF-Consent.docx","1572-Form.pdf","CV.pdf","Monitoring-Report.pdf"],
+    rowActions:["stage","version"], hasRetention:true, hasLock:true, hasInvite:true, hasUploadSession:true,
+    seed(){
+      const c1=Graph.createContainer(this.ctId,"Study ONC-204 — Site 12","eTMF for oncology trial site");
+      Graph.addColumns(c1.id,this.columns);
+      Graph.uploadFile(c1.id,"root","Protocol.pdf",{columns:{Stage:"Collection",Zone:"Zone 2 — Central",Artifact:"Protocol",EdlStatus:"Complete",QcStatus:"Passed"}});
+      Graph.uploadFile(c1.id,"root","ICF-Consent.docx",{columns:{Stage:"Collection",Zone:"Zone 5 — Subjects",Artifact:"Informed Consent",EdlStatus:"Missing",QcStatus:"Pending"}});
+      Graph.uploadFile(c1.id,"root","1572-Form.pdf",{columns:{Stage:"Collection",Zone:"Zone 4 — Site",Artifact:"FDA 1572",EdlStatus:"Complete",QcStatus:"Pending"}});
+      const c2=Graph.createContainer(this.ctId,"Study ONC-204 — Site 27","eTMF for oncology trial site");
+      Graph.addColumns(c2.id,this.columns);
+      Graph.uploadFile(c2.id,"root","Monitoring-Report.pdf",{columns:{Stage:"QC",Zone:"Zone 6 — Monitoring",Artifact:"Monitoring Visit",EdlStatus:"Complete",QcStatus:"Passed"}});
+    },
+    badges:it=>{const b=[];const col=it.columns||{};
+      if(col.Artifact)b.push({t:col.Artifact,c:""});
+      if(col.EdlStatus)b.push({t:col.EdlStatus,c:col.EdlStatus==="Complete"?"green":"red"});
+      if(col.QcStatus)b.push({t:"QC "+col.QcStatus,c:col.QcStatus==="Passed"?"green":"amber"});
+      if(it.sensitivity)b.push({t:"🛡 "+it.sensitivity,c:"red"});
+      if(it.versions&&it.versions.length>1)b.push({t:"v"+it.versions[it.versions.length-1].id,c:"purple"});
+      return b;},
+    dashboard(c){const f=Object.values(Store.items[c.id]).filter(i=>!i.folder);
+      const complete=f.filter(x=>(x.columns||{}).EdlStatus==="Complete").length;
+      const pct=f.length?Math.round(complete/f.length*100):0;
+      const missing=f.filter(x=>(x.columns||{}).EdlStatus==="Missing").length;
+      const qcPending=f.filter(x=>(x.columns||{}).QcStatus==="Pending").length;
+      return statGrid([["EDL completeness",pct+"%"],["Missing slots",missing],["QC pending",qcPending],["Documents",f.length]])
+        +(missing?`<div class="dash-note" style="color:var(--red)">⚠ ${missing} essential document(s) missing — inspection risk.</div>`:"");},
+    collab:[
+      {id:"consent",icon:"✍",label:"Co-author informed-consent form",run:(c,it)=>{Graph.createShareLink(c.id,it.id,"edit","organization");
+        return{title:"Co-authoring consent form",body:"Opened the ICF in Word for the web; automatic versioning builds the Part 11 evidence trail."};}},
+      {id:"scan",icon:"⬆",label:"Upload scanned source (large)",scope:"container",run:(c,it)=>{Graph.createUploadSession(c.id,"root","Source-Scans.pdf",90);
+        return{title:"Large upload session",body:"Streamed a 90 MB scanned bundle via a resumable upload session."};}},
+      {id:"transfer",icon:"📦",label:"TMF transfer to sponsor",run:(c,it)=>{Graph.copyItem(c.id,it.id,"Sponsor-"+it.name);
+        return{title:"TMF transfer",body:"Copied the essential document into the sponsor's destination container and re-permissioned at study close."};}}
+    ],
+    ai:[
+      {id:"classify",icon:"🏷",label:"Auto-classify to EDL slot",run:(c,it)=>aiWrite(c,it,
+        "Classify this incoming document to the correct DIA TMF Reference Model zone/artifact.",
+        {Zone:"Zone 5 — Subjects",Artifact:"Informed Consent",EdlStatus:"Complete"},"Auto-classified",
+        "Matched to <b>Zone 5 · Informed Consent</b>; EDL slot marked Complete. Written back via listItem/fields.")},
+      {id:"complete",icon:"✅",label:"Completeness & timeliness check",run:(c,it)=>aiWrite(c,it,
+        "Assess EDL completeness and flag late-filed essential documents.",null,"Completeness check",
+        "1 missing artifact (consent) and 1 QC-pending. Recommend chase before the monitoring visit.")},
+      {id:"insp",icon:"📝",label:"Summarize for inspection",run:(c,it)=>aiWrite(c,it,
+        "Produce an inspection-readiness summary for this site's TMF.",null,"Inspection summary",
+        "Site 12 TMF is 67% complete; consent form outstanding. All filed docs have a clean version/QC trail.")}
+    ],
+    security:[
+      {id:"label",icon:"🛡",label:"Apply Part-11 sensitivity label",run:(c,it)=>{Graph.assignSensitivity(c.id,it.id,"Regulated — GxP");
+        return{title:"Sensitivity label applied",body:"Regulated record labelled & encrypted; audit and access ride on the sponsor's Purview."};}},
+      {id:"ret",icon:"🔒",label:"Retention (post-trial multi-year)",run:(c,it)=>{Graph.setRetention(c.id,it.id,"Clinical Record — 25 yr",25);
+        return{title:"Retention applied",body:"Essential document retained 25 years post-trial per ICH GCP / Part 11."};}},
+      {id:"lock",icon:"📋",label:"Lock archive at study close",scope:"container",run:(c,it)=>{Graph.lockContainer(c.id,true);
+        return{title:"Archive locked",body:"Study TMF locked read-only for the long-term regulated archive."};}}
+    ]
+  },
+
+  /* ================== App 4 — INSURANCE: Claims Case-File ================== */
+  insurance:{
+    key:"insurance", label:"Insurance — Claims", color:"#c43501",
+    app:"ClaimDesk", tagline:"P&C claims case-file: FNOL → multi-channel intake → adjuster review → closure",
+    leads:"Copilot / OCR ingestion + Storage",
+    capability:"Event-driven ingestion (subscriptions + delta) · OCR metadata · adjuster copilot · PHI-safe preview",
+    containerType:"Claim Case File",
+    term:{container:"Claim",containers:"Claims",newContainer:"New FNOL / claim",doc:"document"},
+    pipeline:["FNOL","Intake","Review","Approval","SIU/Fraud","Closure"],
+    columns:[{name:"Stage",text:{}},{name:"LOB",text:{}},{name:"Adjuster",text:{}},{name:"Reserve",text:{}},{name:"Classification",text:{}}],
+    docKinds:["Damage-Photo.jpg","Police-Report.pdf","Repair-Estimate.xlsx","Medical-Report.pdf","Invoice.pdf"],
+    rowActions:["stage"], hasRetention:true, hasContainerHold:true, hasPreview:true, hasInvite:true, hasUploadSession:true,
+    seed(){
+      const c1=Graph.createContainer(this.ctId,"Claim CLM-88231 — Auto Collision","P&C auto claim");
+      Graph.addColumns(c1.id,this.columns);
+      Graph.uploadFile(c1.id,"root","Damage-Photo.jpg",{size:8*1024*1024,columns:{Stage:"Review",LOB:"Auto",Adjuster:"R. Vance",Reserve:"14500",Classification:"Photo"}});
+      Graph.uploadFile(c1.id,"root","Police-Report.pdf",{columns:{Stage:"Review",LOB:"Auto",Adjuster:"R. Vance",Reserve:"14500",Classification:"Report"}});
+      Graph.uploadFile(c1.id,"root","Repair-Estimate.xlsx",{columns:{Stage:"Review",LOB:"Auto",Adjuster:"R. Vance",Reserve:"14500",Classification:"Estimate"}});
+      const c2=Graph.createContainer(this.ctId,"Claim CLM-88247 — Property","P&C property claim");
+      Graph.addColumns(c2.id,this.columns);
+      Graph.uploadFile(c2.id,"root","Invoice.pdf",{columns:{Stage:"Intake",LOB:"Property",Adjuster:"K. Boone",Reserve:"32000",Classification:"Unclassified"}});
+    },
+    badges:it=>{const b=[];const col=it.columns||{};
+      if(col.Classification)b.push({t:col.Classification,c:col.Classification==="Unclassified"?"amber":"green"});
+      if(col.Reserve)b.push({t:"reserve "+money(col.Reserve),c:"purple"});
+      if(it.invites&&it.invites.length)b.push({t:"📨 SIU",c:"red"});
+      if(it.sensitivity)b.push({t:"🛡 "+it.sensitivity,c:"red"});
+      return b;},
+    dashboard(c){const f=Object.values(Store.items[c.id]).filter(i=>!i.folder);
+      const reserve=(f[0]&&numCol(f[0],"Reserve"))||0;
+      const unclass=f.filter(x=>(x.columns||{}).Classification==="Unclassified").length;
+      const stage=(f[0]&&(f[0].columns||{}).Stage)||"FNOL";
+      return statGrid([["Reserve",money(reserve)],["Documents",f.length],["Unclassified",unclass],["Stage",stage]])
+        +`<div class="dash-note">${c.subscribed?"🔔 Change subscription active — new uploads auto-process via delta.":"Tip: turn on the change subscription to auto-ingest new documents."}</div>`;},
+    collab:[
+      {id:"media",icon:"⬆",label:"Ingest damage media (large)",scope:"container",run:(c,it)=>{Graph.createUploadSession(c.id,"root","Scene-Video.mp4",320);
+        return{title:"Large media ingested",body:"Streamed a 320 MB scene video via a resumable upload session — SPE handles very large binaries."};}},
+      {id:"sub",icon:"🔔",label:"Turn on event-driven ingestion",scope:"container",run:(c,it)=>{Graph.createSubscription(c.id);
+        return{title:"Subscription + delta",body:"Subscribed to drive changes; each webhook triggers <code>/root/delta</code> to OCR-process just the new documents."};}},
+      {id:"preview",icon:"👁",label:"Preview report (PHI-safe, no download)",run:(c,it)=>{Graph.previewItem(c.id,it.id);
+        return{title:"PHI-safe preview",body:"Rendered a medical report in-browser via WOPI — no PHI bytes downloaded to the workstation."};}},
+      {id:"siu",icon:"📨",label:"Share subset with SIU investigator",run:(c,it)=>{Graph.inviteItem(c.id,it.id,"siu-investigator@carrier.com","read");
+        return{title:"SIU share",body:"Invited a fraud investigator to this document only — the fraud branch sees a subset, not the whole file."};}}
+    ],
+    ai:[
+      {id:"ocr",icon:"🔤",label:"OCR classify & extract totals",run:(c,it)=>aiWrite(c,it,
+        "OCR the document, classify its type, and extract estimate totals and dates.",
+        {Classification:"Estimate",Reserve:"16200"},"OCR extraction",
+        "Classified as <b>Repair Estimate</b>; extracted total <b>$16,200</b> and loss date. Written onto the driveItem's metadata.")},
+      {id:"summ",icon:"🧑‍💼",label:"Adjuster copilot: summarize claim",run:(c,it)=>aiWrite(c,it,
+        "Summarize this claim, list open items and total the estimates for the adjuster.",null,"Adjuster brief",
+        "Auto collision, reserve $14.5K. Open items: medical report, recorded statement. Estimates total $16,200. Grounded on this case file only.")},
+      {id:"fraud",icon:"🚩",label:"Flag potential fraud indicators",run:(c,it)=>aiWrite(c,it,
+        "Scan the case file for common fraud indicators.",{Stage:"SIU/Fraud"},"Fraud indicators",
+        "2 soft indicators (late reporting, inconsistent damage). Recommend SIU review — stage moved to SIU/Fraud.")}
+    ],
+    security:[
+      {id:"phi",icon:"🛡",label:"Apply HIPAA/PII label",run:(c,it)=>{Graph.assignSensitivity(c.id,it.id,"Confidential — PHI");
+        return{title:"PHI label applied",body:"Medical content encrypted & DLP-protected; stays in the carrier's tenant."};}},
+      {id:"hold",icon:"⚖",label:"Legal hold (litigated claim)",scope:"container",run:(c,it)=>{Graph.legalHold(c.id,true);
+        return{title:"Legal hold placed",body:"Entire case file preserved for litigation / eDiscovery."};}},
+      {id:"ret",icon:"🔒",label:"Retention schedule by LOB",run:(c,it)=>{Graph.setRetention(c.id,it.id,"Claim Record — 7 yr",7);
+        return{title:"Retention applied",body:"Case-file record retained per the line-of-business schedule."};}}
+    ]
+  },
+
+  /* ============ App 5 — CONSTRUCTION / AEC: Drawing & Submittal ============ */
+  construction:{
+    key:"construction", label:"Construction — AEC", color:"#8a6d00",
+    app:"BuildSet", tagline:"Drawing & submittal control: current set → submittals → RFIs → closeout",
+    leads:"Storage (large binaries) + external collaboration",
+    capability:"Large-file upload sessions · revision control (single source of truth) · unlicensed external collaborators",
+    containerType:"Project",
+    term:{container:"Project",containers:"Projects",newContainer:"New project",doc:"drawing"},
+    pipeline:["Setup","Design","Submittal","RFI","Construction","Closeout"],
+    columns:[{name:"Stage",text:{}},{name:"DrawingNumber",text:{}},{name:"Discipline",text:{}},{name:"Revision",text:{}},{name:"RfiStatus",text:{}}],
+    docKinds:["Drawing-A101.pdf","BIM-Model.ifc","Submittal-12.pdf","RFI-034.pdf","Spec-Section.pdf"],
+    rowActions:["stage","version"], hasRetention:true, hasLock:true, hasInvite:true, hasPreview:true, hasUploadSession:true,
+    seed(){
+      const c1=Graph.createContainer(this.ctId,"Riverside Tower","GC project workspace");
+      Graph.addColumns(c1.id,this.columns);
+      Graph.uploadFile(c1.id,"root","Drawing-A101.pdf",{size:60*1024*1024,columns:{Stage:"Submittal",DrawingNumber:"A-101",Discipline:"Architectural",Revision:"1",RfiStatus:"—"}});
+      Graph.addVersion(c1.id,Object.values(Store.items[c1.id])[0].id);
+      Graph.setItemColumns(c1.id,Object.values(Store.items[c1.id])[0].id,{Revision:"2"});
+      Graph.uploadFile(c1.id,"root","RFI-034.pdf",{columns:{Stage:"RFI",DrawingNumber:"S-220",Discipline:"Structural",Revision:"—",RfiStatus:"Open"}});
+      const c2=Graph.createContainer(this.ctId,"Harbor Bridge Retrofit","GC project workspace");
+      Graph.addColumns(c2.id,this.columns);
+      Graph.uploadFile(c2.id,"root","Submittal-12.pdf",{columns:{Stage:"Submittal",DrawingNumber:"—",Discipline:"Civil",Revision:"—",RfiStatus:"—"}});
+    },
+    badges:it=>{const b=[];const col=it.columns||{};
+      if(col.DrawingNumber&&col.DrawingNumber!=="—")b.push({t:col.DrawingNumber,c:"purple"});
+      if(col.Discipline)b.push({t:col.Discipline,c:""});
+      if(col.Revision&&col.Revision!=="—")b.push({t:"Rev "+col.Revision,c:"blue"});
+      if(col.RfiStatus==="Open")b.push({t:"RFI open",c:"red"});
+      if(it.invites&&it.invites.length)b.push({t:"📨 external",c:"green"});
+      if(it.versions&&it.versions.length>1)b.push({t:"v"+it.versions[it.versions.length-1].id,c:"purple"});
+      return b;},
+    dashboard(c){const f=Object.values(Store.items[c.id]).filter(i=>!i.folder);
+      const rfi=f.filter(x=>(x.columns||{}).RfiStatus==="Open").length;
+      const draw=f.filter(x=>(x.columns||{}).DrawingNumber&&x.columns.DrawingNumber!=="—").length;
+      const rev=(f[0]&&(f[0].columns||{}).Revision)||"—";
+      const stage=(f[0]&&(f[0].columns||{}).Stage)||"Setup";
+      return statGrid([["Drawings",draw],["Open RFIs",rfi],["Current rev",rev],["Stage",stage]])
+        +`<div class="dash-note">Publishing a new revision to the same item keeps the <b>current set</b> authoritative — superseded revisions stay in version history.</div>`;},
+    collab:[
+      {id:"upload",icon:"⬆",label:"Upload large drawing / BIM (session)",scope:"container",run:(c,it)=>{Graph.createUploadSession(c.id,"root","BIM-Model.ifc",450);
+        return{title:"Large-file session",body:"Streamed a 450 MB BIM model in chunks via <code>createUploadSession</code>."};}},
+      {id:"rev",icon:"⟳",label:"Publish new revision",run:(c,it)=>{Graph.addVersion(c.id,it.id);
+        return{title:"Revision published",body:"New content to the same item → a new version; the prior 'current set' is preserved and never built-from by mistake."};}},
+      {id:"invite",icon:"📨",label:"Invite external sub / owner (no M365 license)",run:(c,it)=>{Graph.inviteItem(c.id,it.id,"sub@steel-erectors.com","write");
+        return{title:"External collaborator",body:"Invited an unlicensed external party to this drawing — SPE's no-per-seat model fits transient project teams."};}},
+      {id:"preview",icon:"👁",label:"Preview drawing markup",run:(c,it)=>{Graph.previewItem(c.id,it.id);
+        return{title:"In-browser preview",body:"Rendered the large-format drawing via WOPI for markup without a full download."};}}
+    ],
+    ai:[
+      {id:"rfi",icon:"🔎",label:"Which RFIs are open on east elevation?",run:(c,it)=>aiWrite(c,it,
+        "List open RFIs affecting the east elevation and their SLA status.",null,"Open RFIs",
+        "1 open RFI (S-220, structural) past its 5-day SLA. Grounded on this project's containers.")},
+      {id:"submittal",icon:"📝",label:"Summarize submittal 12",run:(c,it)=>aiWrite(c,it,
+        "Summarize submittal 12 and its review status.",null,"Submittal summary",
+        "Submittal 12 (rebar) — architect review pending 3 days. No open exceptions.")},
+      {id:"current",icon:"📐",label:"Confirm this is the current revision",run:(c,it)=>aiWrite(c,it,
+        "Confirm whether this drawing is the latest published revision.",null,"Revision check",
+        "A-101 is at <b>Rev 2</b> (latest). Rev 1 is superseded and retained in version history.")}
+    ],
+    security:[
+      {id:"ret",icon:"🔒",label:"Retention for statute of repose",run:(c,it)=>{Graph.setRetention(c.id,it.id,"As-Built — 12 yr",12);
+        return{title:"Retention applied",body:"As-built retained for the statute-of-repose / liability period."};}},
+      {id:"lock",icon:"📋",label:"Lock as-built archive",scope:"container",run:(c,it)=>{Graph.lockContainer(c.id,true);
+        return{title:"As-built locked",body:"Closeout archive locked read-only for the project record."};}},
+      {id:"label",icon:"🛡",label:"Label sensitive site drawings",run:(c,it)=>{Graph.assignSensitivity(c.id,it.id,"Confidential — Project");
+        return{title:"Label applied",body:"Sensitive infrastructure drawings encrypted & access-controlled."};}}
+    ]
+  },
+
+  /* ============= App 6 — MEDIA / MARKETING: AI Digital Asset Mgmt ============= */
+  media:{
+    key:"media", label:"Media — DAM", color:"#b4009e",
+    app:"BrandVault", tagline:"AI digital asset management: ingest → AI tag → review → distribute → archive",
+    leads:"Copilot / semantic search",
+    capability:"AI vision auto-tagging · semantic search (no vector DB) · thumbnails/renditions · rights-expiry automation",
+    containerType:"Brand / Campaign Library",
+    term:{container:"Library",containers:"Libraries",newContainer:"New campaign library",doc:"asset"},
+    pipeline:["Ingest","AI Tag","Review","Approve","Distribute","Archive"],
+    columns:[{name:"Stage",text:{}},{name:"AssetType",text:{}},{name:"Tags",text:{}},{name:"License",text:{}},{name:"ExpiryDate",text:{}},{name:"ApprovalState",text:{}}],
+    docKinds:["Hero-Image.psd","Product-Shot.jpg","Promo-Video.mp4","Logo.png","Campaign-Brief.docx"],
+    rowActions:["stage"], hasSearch:true, hasRetention:true, hasPreview:true, hasUploadSession:true,
+    seed(){
+      const c1=Graph.createContainer(this.ctId,"Spring Campaign 2026","Brand campaign library");
+      Graph.addColumns(c1.id,this.columns);
+      Graph.uploadFile(c1.id,"root","Hero-Image.psd",{size:120*1024*1024,columns:{Stage:"AI Tag",AssetType:"Image",Tags:"",License:"Royalty-free",ExpiryDate:"2026-09-30",ApprovalState:"Pending"}});
+      Graph.uploadFile(c1.id,"root","Promo-Video.mp4",{size:640*1024*1024,columns:{Stage:"Review",AssetType:"Video",Tags:"product, lifestyle",License:"Licensed",ExpiryDate:"2026-12-31",ApprovalState:"Pending"}});
+      Graph.uploadFile(c1.id,"root","Campaign-Brief.docx",{columns:{Stage:"Review",AssetType:"Brief",Tags:"",License:"—",ExpiryDate:"",ApprovalState:"Approved"}});
+      const c2=Graph.createContainer(this.ctId,"Evergreen Brand Assets","Always-on brand library");
+      Graph.addColumns(c2.id,this.columns);
+      Graph.uploadFile(c2.id,"root","Logo.png",{columns:{Stage:"Distribute",AssetType:"Image",Tags:"logo, brand",License:"Owned",ExpiryDate:"",ApprovalState:"Approved"}});
+    },
+    badges:it=>{const b=[];const col=it.columns||{};
+      if(col.AssetType)b.push({t:col.AssetType,c:""});
+      if(col.Tags)b.push({t:"🏷 "+col.Tags,c:"blue"});
+      if(col.ApprovalState)b.push({t:col.ApprovalState,c:col.ApprovalState==="Approved"?"green":"amber"});
+      if(col.ExpiryDate)b.push({t:"⏳ "+col.ExpiryDate,c:"purple"});
+      if(it.sensitivity)b.push({t:"🛡 "+it.sensitivity,c:"red"});
+      return b;},
+    dashboard(c){const f=Object.values(Store.items[c.id]).filter(i=>!i.folder);
+      const today=new Date("2026-09-07");
+      const expiring=f.filter(x=>{const d=(x.columns||{}).ExpiryDate;if(!d)return false;const days=(new Date(d)-today)/864e5;return days>=0&&days<=30;}).length;
+      const approved=f.filter(x=>(x.columns||{}).ApprovalState==="Approved").length;
+      const pct=f.length?Math.round(approved/f.length*100):0;
+      const stage=(f[0]&&(f[0].columns||{}).Stage)||"Ingest";
+      return statGrid([["Assets",f.length],["Approved",pct+"%"],["Rights expiring ≤30d",expiring],["Stage",stage]])
+        +(expiring?`<div class="dash-note" style="color:var(--red)">⏳ ${expiring} asset(s) with license expiring within 30 days — renew or retire.</div>`:"");},
+    collab:[
+      {id:"ingest",icon:"⬆",label:"Bulk-ingest large media (session)",scope:"container",run:(c,it)=>{Graph.createUploadSession(c.id,"root","RAW-Shoot.zip",1200);
+        return{title:"Large media ingested",body:"Streamed a 1.2 GB RAW shoot via a resumable upload session."};}},
+      {id:"thumb",icon:"🖼",label:"Generate thumbnails for the grid",run:(c,it)=>{Graph.getThumbnails(c.id,it.id);
+        return{title:"Thumbnails",body:"Fetched server-generated thumbnails/renditions — no local image processing to build."};}},
+      {id:"dist",icon:"🔗",label:"Distribute rendition to channel",run:(c,it)=>{Graph.createShareLink(c.id,it.id,"view","anonymous");
+        return{title:"Rendition distributed",body:"Created a share link for the web/social channel; egress is metered pay-as-you-go."};}},
+      {id:"brief",icon:"✍",label:"Co-author campaign brief",run:(c,it)=>{Graph.createShareLink(c.id,it.id,"edit","organization");
+        return{title:"Brief co-authoring",body:"Opened the campaign brief in Word for the web alongside the assets."};}}
+    ],
+    ai:[
+      {id:"tag",icon:"👁",label:"AI vision auto-tag asset",run:(c,it)=>aiWrite(c,it,
+        "Analyze the image and auto-tag objects, colors and usage context.",
+        {Tags:"blue product, lifestyle, outdoor",Stage:"Review"},"Auto-tagged",
+        "Detected <b>blue product · lifestyle · outdoor</b>. Tags written to metadata → instantly searchable.")},
+      {id:"search",icon:"🔎",label:"Semantic search: 'blue product lifestyle'",run:(c,it)=>aiWrite(c,it,
+        "Find approved lifestyle shots featuring a blue product.",null,"Semantic search",
+        "2 matching approved assets. Powered by Microsoft Search + Copilot grounding — no external vector DB.")},
+      {id:"rights",icon:"⏳",label:"Summarize expiring rights",run:(c,it)=>aiWrite(c,it,
+        "List assets whose license expires within 30 days.",null,"Rights expiry",
+        "1 licensed asset expires 2026-09-30. Recommend renewal or removal from active channels.")}
+    ],
+    security:[
+      {id:"gdpr",icon:"🛡",label:"GDPR/PII label (images of people)",run:(c,it)=>{Graph.assignSensitivity(c.id,it.id,"Personal Data — GDPR");
+        return{title:"GDPR label applied",body:"Assets featuring identifiable people labelled for GDPR handling."};}},
+      {id:"scan",icon:"🔔",label:"Schedule rights-expiry scan",scope:"container",run:(c,it)=>{Graph.createSubscription(c.id);
+        return{title:"Expiry scan scheduled",body:"Change subscription + scheduled scan flag assets approaching license expiry."};}},
+      {id:"ret",icon:"🗄",label:"Archive & retain cold assets",run:(c,it)=>{Graph.setRetention(c.id,it.id,"Brand Asset — 5 yr",5);
+        return{title:"Archived",body:"Cold assets retained cheaply on SPE storage tiers per brand policy."};}}
+    ]
+  }
+};
+</script>
+
+<script>
+/* ============================================================================
+   3. UI STATE + RENDERING
+============================================================================ */
+const UI={ current:null, activeContainer:null, activeFolder:"root", lastCode:null };
+let prevSnap=null;      // backend snapshot for diffing
+let lastDiffHtml="";    // html of the most recent backend diff
+
+function seedAll(){
+  for(const key in SCENARIOS){
+    const s=SCENARIOS[key];
+    const ct=Graph.registerContainerType(s.containerType);
+    s.ctId=ct.id; s.seed();
+  }
+  Store.calls=[];  // start the API log clean (hide seeding calls)
+  prevSnap=null; lastDiffHtml="";
+}
+
+function boot(){
+  seedAll();
+  renderVerticals();
+  selectScenario("finance");
+  wireGlobal();
+}
+
+function resetSandbox(){
+  Store.containerTypes={}; Store.containers={}; Store.items={}; Store.audit=[]; Store.calls=[];
+  seedAll();
+  selectScenario(UI.current||"finance");
+  toast("Sandbox reset to a clean state");
+}
+
+function renderVerticals(){
+  const wrap=document.getElementById("verticals");
+  wrap.innerHTML="";
+  for(const key in SCENARIOS){
+    const s=SCENARIOS[key];
+    const b=document.createElement("button");
+    b.className="vtab"+(UI.current===key?" active":"");
+    b.innerHTML=`<span class="dot" style="color:${s.color}"></span>${s.label}`;
+    b.onclick=()=>selectScenario(key);
+    wrap.appendChild(b);
+  }
+}
+
+function selectScenario(key){
+  UI.current=key; const s=SCENARIOS[key];
+  const conts=Object.values(Store.containers).filter(c=>c.containerTypeId===s.ctId);
+  UI.activeContainer=conts[0]?conts[0].id:null; UI.activeFolder="root"; UI.aiResult=null;
+  document.getElementById("appTitle").textContent=s.app;
+  document.getElementById("appSub").textContent="· "+s.tagline;
+  document.getElementById("footCtype").textContent=s.containerType;
+  renderVerticals(); renderApp(); renderBackend(); updateCounters();
+  if(typeof renderTryit==="function") renderTryit();
+  // reset code hint
+  setCode(null);
+}
+
+/* ----- LEFT PANE: the live app (dispatches to a bespoke per-app view) ----- */
+function selectContainer(cid){ UI.activeContainer=cid; UI.activeFolder="root"; UI.aiResult=null; renderApp(); }
+
+function renderApp(){
+  const s=SCENARIOS[UI.current];
+  const body=document.getElementById("appBody"); body.innerHTML="";
+  const conts=Object.values(Store.containers).filter(c=>c.containerTypeId===s.ctId);
+  if(!UI.activeContainer || !Store.containers[UI.activeContainer] || Store.containers[UI.activeContainer].containerTypeId!==s.ctId){
+    UI.activeContainer=conts[0]?conts[0].id:null;
+  }
+  // app identity banner (distinct accent per app)
+  const banner=document.createElement("div"); banner.className="appbanner"; banner.style.setProperty("--ac",s.color);
+  banner.innerHTML=`<div class="ab-icon">${appGlyph(s.key)}</div>
+    <div class="ab-txt"><div class="ab-name">${s.app}<span class="ab-ind">${s.label}</span></div>
+      <div class="ab-tag">${s.tagline}</div></div>
+    <div class="ab-pill">leads with ${s.leads||s.capability}</div>`;
+  body.appendChild(banner);
+
+  if(UI.aiResult){ const r=renderAiResult(); r.style.margin="0 0 10px"; body.appendChild(r); }
+
+  // dispatch to the app's native UI
+  const view=(typeof VIEWS!=="undefined"&&VIEWS[s.key])?VIEWS[s.key]:null;
+  const main=document.createElement("div");
+  if(view){ view(main,s,conts); }
+  else { main.innerHTML='<div class="empty">No view.</div>'; }
+  body.appendChild(main);
+
+  // full SPE operation surface, tucked away so the native UI leads
+  if(UI.activeContainer && Store.containers[UI.activeContainer]) body.appendChild(renderSpeOps(s,Store.containers[UI.activeContainer]));
+}
+
+function renderSpeOps(s,c){
+  const d=document.createElement("details"); d.className="speops";
+  d.innerHTML=`<summary>⚙ All SPE operations for this app — collaboration · Copilot · security</summary>`;
+  const box=document.createElement("div"); box.className="speops-body";
+  box.appendChild(renderActionPanel(s,c,"collab","🤝 Collaboration & storage","Office co-authoring, large-file uploads, preview, external sharing."));
+  box.appendChild(renderActionPanel(s,c,"ai","🤖 Copilot AI","Grounded on this container via the Copilot Retrieval API — no external vector DB."));
+  box.appendChild(renderActionPanel(s,c,"security","🛡 Security & compliance","Purview labels, container permissions, holds, container lock."));
+  d.appendChild(box);
+  return d;
+}
+function appGlyph(k){return {legal:"⚖",finance:"🏦",healthcare:"🧬",insurance:"🛟",construction:"🏗",media:"🎬"}[k]||"◆";}
+
+function statGrid(pairs){
+  return '<div class="dash-grid">'+pairs.map(p=>
+    '<div class="dash-cell"><div class="dv">'+p[1]+'</div><div class="dk">'+p[0]+'</div></div>').join("")+'</div>';
+}
+function renderPipeline(s,c){
+  const wrap=document.createElement("div"); wrap.className="pipeline";
+  const files=Object.values(Store.items[c.id]).filter(i=>!i.folder);
+  const cur=(files[0]&&files[0].columns&&files[0].columns.Stage)||s.pipeline[0];
+  const idx=Math.max(0,s.pipeline.indexOf(cur));
+  wrap.innerHTML='<div class="pl-title">Workflow — '+s.term.container+' lifecycle</div><div class="pl-track">'
+    +s.pipeline.map((st,i)=>'<div class="pl-step'+(i<idx?' done':i===idx?' active':'')+'">'
+      +'<span class="pl-dot">'+(i<idx?'✓':i+1)+'</span><span class="pl-lbl">'+st+'</span></div>').join('<span class="pl-line"></span>')
+    +'</div>';
+  return wrap;
+}
+function renderDashboard(s,c){
+  const wrap=document.createElement("div"); wrap.className="dashboard";
+  wrap.innerHTML='<div class="dash-h">📊 '+s.app+' dashboard</div>'+(s.dashboard?s.dashboard(c):"");
+  return wrap;
+}
+function renderActionPanel(s,c,kind,title,sub){
+  const wrap=document.createElement("div"); wrap.className="actpanel "+kind;
+  const actions=s[kind]||[];
+  const files=Object.values(Store.items[c.id]).filter(i=>!i.folder);
+  wrap.innerHTML='<div class="ap-h">'+title+'<span class="ap-sub">'+sub+'</span></div>';
+  const row=document.createElement("div"); row.className="ap-actions";
+  actions.forEach(a=>{
+    const b=document.createElement("button"); b.className="ap-btn "+kind;
+    b.innerHTML='<span class="ap-ic">'+a.icon+'</span>'+a.label;
+    b.disabled=!files.length && a.scope!=="container";
+    b.onclick=()=>runScenarioAction(kind,a.id);
+    row.appendChild(b);
+  });
+  wrap.appendChild(row);
+  return wrap;
+}
+function renderAiResult(){
+  const k=UI.aiResult.kind||"ai";
+  const icon={collab:"🤝",ai:"🤖",security:"🛡"}[k]||"🤖";
+  const wrap=document.createElement("div"); wrap.className="airesult "+k;
+  wrap.innerHTML='<div class="ar-h"><span>'+icon+' '+esc(UI.aiResult.title)+'</span>'
+    +'<button class="rowbtn" onclick="dismissAiResult()">✕</button></div>'
+    +'<div class="ar-body">'+UI.aiResult.body+'</div>';
+  return wrap;
+}
+function dismissAiResult(){UI.aiResult=null;renderApp();}
+
+function runScenarioAction(kind,id,cid,itemId){
+  const s=SCENARIOS[UI.current];
+  cid=cid||UI.activeContainer; const c=Store.containers[cid];
+  if(!c) return;
+  UI.activeContainer=cid;
+  const a=(s[kind]||[]).find(x=>x.id===id); if(!a) return;
+  const it=itemId?Store.items[cid][itemId]:focusFile(c);
+  if(!it && a.scope!=="container"){
+    UI.aiResult={kind,title:"Add a document first",body:"This action operates on a document. Upload one to the "+s.term.container.toLowerCase()+", then try again."};
+    renderApp(); return;
+  }
+  const res=a.run(c,it);
+  UI.aiResult=Object.assign({kind},res);
+  if(it) UI.flashId=it.id;
+  renderApp(); renderBackend(); renderApiLog(); updateCounters();
+  setTimeout(()=>{UI.flashId=null;},1900);
+  toast(({collab:"Collab",ai:"Copilot",security:"Security"}[kind]||"")+": "+res.title);
+}
+
+function renderBrowser(){
+  const s=SCENARIOS[UI.current]; const cid=UI.activeContainer;
+  const wrap=document.createElement("div"); wrap.className="browser";
+  // breadcrumb
+  const crumb=document.createElement("div"); crumb.className="breadcrumb";
+  const c=Store.containers[cid];
+  let html=`<span class="ic">🗄</span><a onclick="gotoFolder('root')">${c.displayName}</a>`;
+  if(UI.activeFolder!=="root"){
+    const f=Store.items[cid][UI.activeFolder];
+    html+=` <span>›</span> <b>${f?f.name:""}</b>`;
+  }
+  const hold=SCENARIOS[UI.current].hasContainerHold;
+  crumb.innerHTML=html+(hold?`<span style="margin-left:auto"></span>`:"");
+  if(hold){
+    const b=mkBtn(c.legalHold?"⚖ Release hold":"⚖ Place legal hold",c.legalHold?"":"",()=>{
+      Graph.legalHold(cid,!c.legalHold); setCode(codeFor("legalHold",{cid}));
+      toast(c.legalHold?"Legal hold released":"Legal hold placed on matter"); renderApp(); renderBackend();
+    });
+    b.style.marginLeft="auto"; crumb.appendChild(b);
+  }
+  wrap.appendChild(crumb);
+
+  const kids=Object.values(Store.items[cid]||{}).filter(i=>(i.parentId||"root")===UI.activeFolder);
+  if(!kids.length){ const e=document.createElement("div");e.className="empty";
+    e.textContent="Empty — upload a "+s.term.doc+" to get started."; wrap.appendChild(e); return wrap; }
+
+  kids.sort((a,b)=>(b.folder?1:0)-(a.folder?1:0));
+  kids.forEach(it=>wrap.appendChild(renderRow(cid,it)));
+  return wrap;
+}
+
+function renderRow(cid,it){
+  const s=SCENARIOS[UI.current];
+  const row=document.createElement("div"); row.className="row"+(UI.flashId===it.id?" flash":"");
+  const icon=it.folder?"📁":fileIcon(it.name);
+  let tags="";
+  if(!it.folder && s.badges){ (s.badges(it)||[]).forEach(bd=>tags+=badge(bd.t,bd.c)); }
+
+  row.innerHTML=`<span class="ic">${icon}</span>
+    <span class="name">${it.name}</span>
+    <span class="meta">${tags}<span class="tag">${it.folder?"":fmtSize(it.size)}</span></span>`;
+  row.querySelector(".name").onclick=()=>{ if(it.folder){UI.activeFolder=it.id;renderApp();}
+    else { Graph.listVersions(cid,it.id); toast("Opened "+it.name); } };
+
+  // row action buttons
+  const meta=row.querySelector(".meta");
+  (s.rowActions||[]).forEach(a=>{ if(it.folder) return;
+    const btn=document.createElement("button"); btn.className="rowbtn";
+    if(a==="stage"){btn.textContent="→ Advance stage";btn.onclick=()=>advanceStage(cid,it.id);}
+    if(a==="metadata"){btn.textContent="✎ Edit fields";btn.onclick=()=>openMetadata(cid,it.id);}
+    if(a==="version"){btn.textContent="⟳ New version";btn.onclick=()=>{Graph.addVersion(cid,it.id);
+      setCode(codeFor("version",{cid,itemId:it.id})); toast("New version created"); renderApp(); renderBackend();};}
+    if(a==="coauthor"){btn.textContent="✍ Co-author";btn.onclick=()=>{Graph.createShareLink(cid,it.id,"edit","organization");
+      setCode(codeFor("coauthor",{cid,itemId:it.id})); toast("Opened for co-authoring"); renderApp(); renderBackend();};}
+    if(a==="hold"){btn.textContent="⚖ Preserve";btn.onclick=()=>{Graph.setItemColumns(cid,it.id,{LegalHold:"Preserved"});
+      setCode(codeFor("itemHold",{cid,itemId:it.id})); toast("Item preserved"); renderApp(); renderBackend();};}
+    if(a==="retention"){btn.textContent="🔒 Retain";btn.onclick=()=>openRetention(cid,it.id);}
+    meta.appendChild(btn);
+  });
+  return row;
+}
+function advanceStage(cid,itemId){
+  const s=SCENARIOS[UI.current]; const it=Store.items[cid][itemId];
+  const cur=(it.columns&&it.columns.Stage)||s.pipeline[0];
+  const next=s.pipeline[Math.min(s.pipeline.indexOf(cur)+1,s.pipeline.length-1)];
+  Graph.setStage(cid,itemId,next);
+  setCode(codeFor("stage",{cid,itemId,next}));
+  UI.flashId=itemId; toast("Stage → "+next);
+  renderApp(); renderBackend(); updateCounters();
+  setTimeout(()=>{UI.flashId=null;},1900);
+}
+function gotoFolder(id){UI.activeFolder=id;renderApp();}
+
+/* ----- helpers ----- */
+function mkBtn(label,cls,fn){const b=document.createElement("button");
+  b.className="btn "+(cls||"");b.textContent=label;b.onclick=fn;return b;}
+function badge(t,c){return `<span class="tag ${c||""}">${t}</span>`;}
+function initials(n){return n.split(/\s+/).slice(0,2).map(w=>w[0]).join("").toUpperCase();}
+function fileIcon(n){const e=n.split(".").pop().toLowerCase();
+  return ({docx:"📝",pdf:"📄",xlsx:"📊",pptx:"📽",dwg:"📐",step:"🧩"}[e])||"📄";}
+function fmtSize(b){if(!b)return"—";const u=["B","KB","MB"];let i=0,v=b;while(v>=1024&&i<2){v/=1024;i++;}return v.toFixed(v<10&&i>0?1:0)+" "+u[i];}
+</script>
+
+<script>
+/* ============================================================================
+   4. MODAL-DRIVEN ACTIONS
+============================================================================ */
+function showModal(html){document.getElementById("modal").innerHTML=html;
+  document.getElementById("modalBg").classList.add("show");}
+function closeModal(){document.getElementById("modalBg").classList.remove("show");}
+document.getElementById("modalBg").addEventListener("click",e=>{if(e.target.id==="modalBg")closeModal();});
+
+function openNewContainer(){
+  const s=SCENARIOS[UI.current];
+  showModal(`<h3>${s.term.newContainer}</h3>
+    <p>Provisions a new <b>${s.containerType}</b> container in the customer's Microsoft 365 tenant.</p>
+    <label>${s.term.container} name</label>
+    <input id="m_name" placeholder="e.g. ${sampleName(s)}"/>
+    <label>Description</label>
+    <input id="m_desc" placeholder="Short description"/>
+    <div class="actions">
+      <button class="btn ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn primary" onclick="doCreateContainer()">Create container</button>
+    </div>`);
+  setTimeout(()=>{const el=document.getElementById("m_name");if(el)el.focus();},50);
+}
+function doCreateContainer(){
+  const s=SCENARIOS[UI.current];
+  const name=val("m_name")||sampleName(s); const desc=val("m_desc")||s.containerType;
+  const c=Graph.createContainer(s.ctId,name,desc);
+  Graph.addColumns(c.id,s.columns);
+  UI.activeContainer=c.id; UI.activeFolder="root";
+  setCode(codeFor("createContainer",{name,desc}));
+  closeModal(); toast(s.term.container+" created"); renderApp(); renderBackend();
+}
+function openUpload(){
+  const s=SCENARIOS[UI.current];
+  const opts=s.docKinds.map(d=>`<option>${d}</option>`).join("");
+  showModal(`<h3>Upload ${s.term.doc}</h3>
+    <p>Uploads document bytes into the container drive, then tags metadata columns.</p>
+    <label>Document</label><select id="m_file">${opts}</select>
+    ${metaInputs(s)}
+    <div class="actions">
+      <button class="btn ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn primary" onclick="doUpload()">Upload</button>
+    </div>`);
+}
+function metaInputs(s){
+  return s.columns.map(col=>`<label>${col.name}</label>
+    <input id="mc_${col.name}" placeholder="${col.name}"/>`).join("");
+}
+function doUpload(){
+  const s=SCENARIOS[UI.current]; const cid=UI.activeContainer;
+  const name=val("m_file"); const columns={};
+  s.columns.forEach(col=>{const v=val("mc_"+col.name); if(v) columns[col.name]=v;});
+  Graph.uploadFile(cid,UI.activeFolder==="root"?"root":UI.activeFolder,name,{columns});
+  setCode(codeFor("upload",{cid,name,columns}));
+  closeModal(); toast("Uploaded "+name); renderApp(); renderBackend();
+}
+function openNewFolder(){
+  showModal(`<h3>New folder</h3><p>Creates a folder inside the container drive.</p>
+    <label>Folder name</label><input id="m_folder" placeholder="e.g. 03 Working papers"/>
+    <div class="actions"><button class="btn ghost" onclick="closeModal()">Cancel</button>
+    <button class="btn primary" onclick="doFolder()">Create</button></div>`);
+}
+function doFolder(){const cid=UI.activeContainer;const name=val("m_folder")||"New folder";
+  Graph.createFolder(cid,UI.activeFolder==="root"?"root":UI.activeFolder,name);
+  setCode(codeFor("folder",{cid,name})); closeModal(); toast("Folder created"); renderApp(); renderBackend();}
+
+function openMetadata(cid,itemId){
+  const s=SCENARIOS[UI.current]; const it=Store.items[cid][itemId];
+  showModal(`<h3>Edit metadata — ${it.name}</h3><p>Updates the document's list-item column values.</p>
+    ${s.columns.map(col=>`<label>${col.name}</label>
+      <input id="ec_${col.name}" value="${(it.columns&&it.columns[col.name])||""}"/>`).join("")}
+    <div class="actions"><button class="btn ghost" onclick="closeModal()">Cancel</button>
+    <button class="btn primary" onclick="doMetadata('${cid}','${itemId}')">Save</button></div>`);
+}
+function doMetadata(cid,itemId){
+  const s=SCENARIOS[UI.current]; const fields={};
+  s.columns.forEach(col=>{fields[col.name]=val("ec_"+col.name);});
+  Graph.setItemColumns(cid,itemId,fields);
+  setCode(codeFor("metadata",{cid,itemId,fields}));
+  closeModal(); toast("Metadata updated"); renderApp(); renderBackend();
+}
+
+function openSearch(){
+  const s=SCENARIOS[UI.current];
+  showModal(`<h3>Search all ${s.term.containers.toLowerCase()}</h3>
+    <p>Full-text + metadata search across every ${s.containerType} container.</p>
+    <label>Query</label><input id="m_q" placeholder="e.g. deposition, or a matter number"/>
+    <div class="actions"><button class="btn ghost" onclick="closeModal()">Cancel</button>
+    <button class="btn primary" onclick="doSearch()">Search</button></div>`);
+  setTimeout(()=>{const el=document.getElementById("m_q");if(el)el.focus();},50);
+}
+function doSearch(){
+  const s=SCENARIOS[UI.current]; const q=val("m_q")||"agreement";
+  const hits=Graph.search(s.ctId,q);
+  setCode(codeFor("search",{q}));
+  closeModal();
+  showModal(`<h3>Search results — "${q}"</h3>
+    <p>${hits.length} hit(s) across ${s.term.containers.toLowerCase()}.</p>
+    <div style="max-height:260px;overflow:auto">${hits.length?hits.map(h=>
+      `<div class="row" style="border:1px solid var(--line);border-radius:6px;margin-bottom:6px">
+        <span class="ic">${fileIcon(h.name)}</span><span class="name">${h.name}</span>
+        <span class="meta"><span class="tag blue">${h.container}</span></span></div>`).join("")
+      :'<div class="empty">No matches.</div>'}</div>
+    <div class="actions"><button class="btn primary" onclick="closeModal()">Done</button></div>`);
+}
+
+function openRetention(cid,itemId){
+  const it=Store.items[cid][itemId];
+  showModal(`<h3>Apply retention label — ${it.name}</h3>
+    <p>Applies a Microsoft Purview retention label and locks the record.</p>
+    <label>Label</label><select id="m_label">
+      <option>Public Record — 7 yr</option><option>Legal — 10 yr</option>
+      <option>Permanent — Archive</option><option>Personnel — 25 yr</option></select>
+    <div class="actions"><button class="btn ghost" onclick="closeModal()">Cancel</button>
+    <button class="btn primary" onclick="doRetention('${cid}','${itemId}')">Apply & lock</button></div>`);
+}
+function doRetention(cid,itemId){
+  const label=val("m_label"); const years=parseInt(label.match(/\d+/)||[7],10);
+  Graph.setRetention(cid,itemId,label,years);
+  setCode(codeFor("retention",{cid,itemId,label}));
+  closeModal(); toast("Retention label applied"); renderApp(); renderBackend();
+}
+function runFoia(){
+  const s=SCENARIOS[UI.current];
+  const n=Graph.exportSet(s.ctId,"public records");
+  setCode(codeFor("foia",{}));
+  toast("FOIA export package compiled ("+n+" records)"); renderBackend();
+}
+
+function advanceApproval(cid,itemId){
+  const it=Store.items[cid][itemId];
+  const order=["Draft","In Review","Approved"];
+  const cur=(it.columns&&it.columns.ApprovalStatus)||"Draft";
+  const next=order[Math.min(order.indexOf(cur)+1,order.length-1)];
+  Graph.setApprovalState(cid,itemId,next,"eng.lead@contoso.com");
+  setCode(codeFor("approval",{cid,itemId,next}));
+  toast("Approval → "+next); renderApp(); renderBackend();
+}
+
+const val=(id)=>{const e=document.getElementById(id);return e?e.value.trim():"";};
+function sampleName(s){return {finance:"Aurora Capital Partners",professional:"Fabrikam — Cloud Migration",
+  legal:"Vertex v. Globex",government:"Public Works — Contracts",manufacturing:"Chassis Frame CF-50"}[s.key];}
+</script>
+
+<script>
+/* ============================================================================
+   5. RIGHT PANE RENDERERS (API log, backend tree, code) + tabs
+============================================================================ */
+function renderApiLog(){
+  const box=document.getElementById("apiLog");
+  if(!Store.calls.length){box.innerHTML='<div class="empty">Interact with the app on the left to see Graph API calls appear here.</div>';return;}
+  box.innerHTML="";
+  Store.calls.slice(0,40).forEach(c=>{
+    const div=document.createElement("div"); div.className="call";
+    const sClass=c.status<400?"s2":"s4";
+    div.innerHTML=`<div class="call-head">
+        <span class="method m-${c.method}">${c.method}</span>
+        <span class="call-url">${c.url}</span>
+        <span class="status ${sClass}">${c.status}</span></div>
+      <div class="call-body">
+        ${c.note?`<div class="kv">💡 ${c.note}</div>`:""}
+        ${c.query?`<div class="kv">Query: <code>${c.query}</code></div>`:""}
+        ${c.body!==null?`<div class="kv">Request body</div><pre>${fmtJson(c.body)}</pre>`:""}
+        ${c.response!==null?`<div class="kv">Response · ${c.status}</div><pre>${fmtJson(c.response)}</pre>`:""}
+      </div>`;
+    div.querySelector(".call-head").onclick=()=>div.classList.toggle("open");
+    box.appendChild(div);
+  });
+  document.getElementById("apiCount").textContent=Store.calls.length;
+}
+
+function renderBackend(){
+  const s=SCENARIOS[UI.current]; const box=document.getElementById("paneBackend");
+  const ctId=s.ctId;
+  const conts=Object.values(Store.containers).filter(c=>c.containerTypeId===ctId);
+  let html=`<div class="tree">
+    <div class="node"><div class="lbl"><span class="ic">🧬</span>
+      <span class="ctype">ContainerType</span>&nbsp;“${s.containerType}”</div>
+      <div class="props">id <code>${ctId}</code> · owningApp <code>${Store.containerTypes[ctId].owningAppId}</code></div>
+      <div class="children">`;
+  conts.forEach(c=>{
+    const items=Object.values(Store.items[c.id]||{});
+    html+=`<div class="node"><div class="lbl"><span class="ic">🗄</span>
+      <span class="cnt">Container</span>&nbsp;${c.displayName} ${c.legalHold?'<span class="tag red">legal hold</span>':''}</div>
+      <div class="props">id <code>${c.id}</code> · columns [${c.columns.map(x=>x.name).join(", ")||"—"}]</div>
+      <div class="children">`;
+    const roots=items.filter(i=>(i.parentId||"root")==="root");
+    html+=roots.map(i=>backendNode(c.id,i)).join("");
+    html+=`</div></div>`;
+  });
+  html+=`</div></div>`;
+  // audit log
+  html+=`<div class="node" style="margin-top:10px"><div class="lbl"><span class="ic">📋</span>
+    <span class="ctype">Audit log</span> (latest ${Math.min(6,Store.audit.length)})</div><div class="props">`;
+  html+=Store.audit.slice(0,6).map(a=>`• <code>${a.action}</code> ${a.detail||""}`).join("<br>")||"—";
+  html+=`</div></div>`;
+  // compute + prepend the backend diff for the most recent mutation
+  const diffHtml=computeBackendDiff();
+  box.innerHTML=diffHtml+html;
+}
+
+/* ---- backend snapshot + diff (shows exactly what a call changed) ---- */
+function snapshotState(){
+  const s=SCENARIOS[UI.current]; const snap={scenario:UI.current,e:{}};
+  Object.values(Store.containers).filter(c=>c.containerTypeId===s.ctId).forEach(c=>{
+    snap.e["Container “"+c.displayName+"”"]={kind:"container",
+      legalHold:!!c.legalHold, columns:c.columns.map(x=>x.name).join(",")};
+    Object.values(Store.items[c.id]||{}).forEach(it=>{
+      snap.e[(it.folder?"Folder ":"File ")+"“"+it.name+"” · "+c.displayName]={
+        kind:it.folder?"folder":"file", versions:(it.versions||[]).length,
+        columns:JSON.stringify(it.columns||{}), retention:it.retentionLabel?it.retentionLabel.name:"",
+        shared:it.shared?it.shared.type:"", size:it.size||0};
+    });
+  });
+  return snap;
+}
+function fieldDiffs(b,a){
+  const out=[];
+  if(b.versions!==undefined&&b.versions!==a.versions) out.push(`versions <code>${b.versions}</code> → <code>${a.versions}</code>`);
+  if(b.legalHold!==undefined&&b.legalHold!==a.legalHold) out.push(`legal hold <code>${b.legalHold}</code> → <code>${a.legalHold}</code>`);
+  if(b.retention!==undefined&&b.retention!==a.retention) out.push(`retention label <code>${a.retention||"—"}</code> applied`);
+  if(b.shared!==undefined&&b.shared!==a.shared) out.push(`sharing link <code>${a.shared||"—"}</code>`);
+  if(b.columns!==undefined&&b.columns!==a.columns){
+    if(a.kind==="container"){ out.push(`columns → [${a.columns||"—"}]`); }
+    else {
+      const bc=JSON.parse(b.columns||"{}"), ac=JSON.parse(a.columns||"{}");
+      Object.keys(ac).forEach(k=>{ if(bc[k]!==ac[k]) out.push(`${k} <code>${bc[k]||"—"}</code> → <code>${ac[k]}</code>`); });
+    }
+  }
+  return out;
+}
+function computeBackendDiff(){
+  const cur=snapshotState();
+  let changes=[];
+  if(prevSnap && prevSnap.scenario===cur.scenario){
+    const bk=prevSnap.e, ak=cur.e;
+    for(const k in ak){
+      if(!(k in bk)){ const a=ak[k];
+        const d = a.kind==="container" ? "new container provisioned"
+          : a.kind==="folder" ? "new folder"
+          : `new file · ${fmtSize(a.size)}`;
+        changes.push({t:"add",k,detail:d});
+      } else { const d=fieldDiffs(bk[k],ak[k]); if(d.length) changes.push({t:"mod",k,detail:d.join(" · ")}); }
+    }
+    for(const k in bk){ if(!(k in ak)) changes.push({t:"del",k,detail:"removed"}); }
+  }
+  prevSnap=cur;
+  let html;
+  if(!changes.length){
+    html=`<div class="diff"><div class="diff-h">🔍 Backend changes from last call</div>
+      <div class="diff-empty">No objects changed (read-only call or no action yet).</div></div>`;
+  } else {
+    html=`<div class="diff"><div class="diff-h">🔍 Backend changes from last call (${changes.length})</div>`
+      +changes.map(c=>{
+        const badge=c.t==="add"?'<span class="diff-badge db-add">ADDED</span>'
+          :c.t==="del"?'<span class="diff-badge db-del">REMOVED</span>'
+          :'<span class="diff-badge db-mod">MODIFIED</span>';
+        return `<div class="diff-row">${badge}<div><div class="dl">${c.k}</div>
+          <div class="dd">${c.detail}</div></div></div>`;
+      }).join("")+`</div>`;
+  }
+  lastDiffHtml=html;
+  return html;
+}
+function backendNode(cid,it){
+  if(it.folder){
+    const kids=Object.values(Store.items[cid]).filter(x=>x.parentId===it.id);
+    return `<div class="node"><div class="lbl"><span class="ic">📁</span>${it.name}</div>
+      <div class="children">${kids.map(k=>backendNode(cid,k)).join("")}</div></div>`;
+  }
+  const cols=it.columns&&Object.keys(it.columns).length
+    ? Object.entries(it.columns).map(([k,v])=>`${k}=<code>${v}</code>`).join(" · "):"—";
+  const ver=it.versions&&it.versions.length?` · versions ${it.versions.length}`:"";
+  const ret=it.retentionLabel?` · 🔒 ${it.retentionLabel.name}`:"";
+  return `<div class="node"><div class="lbl"><span class="ic">${fileIcon(it.name)}</span>${it.name}</div>
+    <div class="props">${fmtSize(it.size)}${ver}${ret}<br>${cols}</div></div>`;
+}
+
+function updateCounters(){
+  const s=SCENARIOS[UI.current]; if(!s) return;
+  const conts=Object.values(Store.containers).filter(c=>c.containerTypeId===s.ctId);
+  let files=0; conts.forEach(c=>files+=Object.values(Store.items[c.id]||{}).filter(i=>!i.folder).length);
+  document.getElementById("footConts").textContent=conts.length;
+  document.getElementById("footFiles").textContent=files;
+  document.getElementById("footCalls").textContent=Store.calls.length;
+  document.getElementById("apiCount").textContent=Store.calls.length;
+}
+
+/* ----- JSON syntax highlight ----- */
+function fmtJson(obj){
+  if(typeof obj==="string") return esc(obj);
+  let json=JSON.stringify(obj,null,2);
+  json=esc(json);
+  return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+    m=>{let c="tok-num";
+      if(/^"/.test(m)){c=/:$/.test(m)?"tok-key":"tok-str";}
+      else if(/true|false/.test(m)){c="tok-bool";}else if(/null/.test(m)){c="tok-bool";}
+      return `<span class="${c}">${m}</span>`;});
+}
+function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+
+/* ----- tabs ----- */
+document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
+  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+  document.querySelectorAll(".tabpane").forEach(x=>x.classList.remove("active"));
+  t.classList.add("active");
+  document.querySelector(`.tabpane[data-pane="${t.dataset.tab}"]`).classList.add("active");
+});
+function wireGlobal(){
+  document.getElementById("clearLog").onclick=()=>{Store.calls=[];renderApiLog();updateCounters();};
+  document.getElementById("resetBtn").onclick=resetSandbox;
+  document.getElementById("copyCode").onclick=()=>{
+    const code=document.getElementById("codeBlock").innerText;
+    navigator.clipboard&&navigator.clipboard.writeText(code); toast("Sample code copied");};
+  // divider drag
+  const split=document.getElementById("split"),div=document.getElementById("divider");
+  let dragging=false;
+  div.addEventListener("mousedown",()=>{dragging=true;document.body.style.userSelect="none";});
+  window.addEventListener("mouseup",()=>{dragging=false;document.body.style.userSelect="";});
+  window.addEventListener("mousemove",e=>{if(!dragging)return;
+    const r=split.getBoundingClientRect();const pct=(e.clientX-r.left)/r.width*100;
+    if(pct>25&&pct<75) split.style.gridTemplateColumns=`${pct}% 6px ${100-pct}%`;});
+}
+
+/* ----- toast ----- */
+let toastTimer;
+function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove("show"),1900);}
+</script>
+
+<script>
+/* ============================================================================
+   5b. "TRY IT" API CONSOLE
+   Lets the developer author & edit real SPE Graph requests, execute them
+   against the simulated backend, and watch the live app UI (left) react.
+============================================================================ */
+/* ---- code token helpers: mark VARIABLES (green) vs CONSTANTS (grey) ---- */
+const VS="\uE000",VE="\uE001",CS="\uE002",CE="\uE003";
+const Vv=x=>VS+x+VE, Cc=x=>CS+x+CE, q=x=>JSON.stringify(x);
+function codeHtml(t){return esc(t).split(VS).join('<span class="cvar">').split(VE).join('</span>')
+  .split(CS).join('<span class="cconst">').split(CE).join('</span>');}
+
+let rcCodeMode="sdk";
+const rcState={containerId:null,itemId:null};
+
+/* ---- guided recipe library: each action = a plain-English task with
+       clearly separated variables (editable) and constants (fixed) ---- */
+const RECIPES=[
+  { id:"createContainer", icon:"🗄", title:"Create a container", available:()=>true, need:{},
+    desc:"Provision a brand-new document store. Everything (files, folders, metadata) lives inside a container.",
+    vars:ctx=>[
+      {key:"displayName",label:"Container name",hint:"any human-readable name for this "+ctx.s.term.container.toLowerCase(),def:sampleName(ctx.s)},
+      {key:"description",label:"Description",hint:"optional free text",def:ctx.s.containerType}],
+    consts:ctx=>[["Endpoint","POST /storage/fileStorage/containers"],
+      ["containerTypeId",ctx.s.ctId,"identifies your app's container type — the same for every container you create"]],
+    request:(v,ctx)=>({method:"POST",path:"/storage/fileStorage/containers",
+      body:{displayName:v.displayName,description:v.description,containerTypeId:ctx.s.ctId}}),
+    sdk:(v,ctx)=>"// Create a new SharePoint Embedded container\n"+
+      "const container = await graph\n  .api("+Cc('"/storage/fileStorage/containers"')+")\n  .post({\n"+
+      "    displayName: "+Vv(q(v.displayName))+",\n    description: "+Vv(q(v.description))+",\n"+
+      "    containerTypeId: "+Cc(q(ctx.s.ctId))+"\n  });",
+    rest:(v,ctx)=>Cc("POST")+" "+Cc("/storage/fileStorage/containers")+"\n\n{\n"+
+      '  "displayName": '+Vv(q(v.displayName))+",\n"+'  "description": '+Vv(q(v.description))+",\n"+
+      '  "containerTypeId": '+Cc(q(ctx.s.ctId))+"\n}" },
+
+  { id:"addFile", icon:"⬆", title:"Add a file", available:()=>true, need:{container:true},
+    desc:"Upload a document's bytes into a container. The file NAME is yours to choose; the container id and the /content endpoint are fixed.",
+    vars:ctx=>[{key:"fileName",label:"File name",hint:"the name (with extension) the document will have in the drive",def:ctx.s.docKinds[0]}],
+    consts:ctx=>[["Endpoint","PUT /drives/{containerId}/root:/{fileName}:/content"],
+      ["containerId",short(ctx.container.id),"the target container's drive"]],
+    request:(v,ctx)=>({method:"PUT",path:"/drives/"+short(ctx.container.id)+"/root:/"+v.fileName+":/content",body:"<binary file bytes>"}),
+    sdk:(v,ctx)=>"// Upload a file into the container's drive (simple upload, < 4 MB)\n"+
+      "const containerId = "+Cc(q(short(ctx.container.id)))+";   // constant for this container\n\n"+
+      "const item = await graph\n  .api(`/drives/${"+Cc("containerId")+"}/root:/"+Vv(v.fileName)+":/content`)\n"+
+      "  .put("+Cc("fileBytes")+");   // fileBytes = the raw file contents",
+    rest:(v,ctx)=>Cc("PUT")+" /drives/"+Cc(short(ctx.container.id))+"/root:/"+Vv(v.fileName)+":/content\n\n"+Cc("<binary file bytes>") },
+
+  { id:"addColumn", icon:"🏷", title:"Add a metadata column", available:()=>true, need:{container:true},
+    desc:"Define a typed column on the container so documents can be tagged and later searched or filtered.",
+    vars:ctx=>[{key:"columnName",label:"Column name",hint:"e.g. Region, Status, ReviewerEmail",def:"Region"}],
+    consts:ctx=>[["Endpoint","POST /storage/fileStorage/containers/{id}/columns"],
+      ["column type","text","other types: number, dateTime, choice, boolean, currency…"]],
+    request:(v,ctx)=>({method:"POST",path:"/storage/fileStorage/containers/"+short(ctx.container.id)+"/columns",body:{name:v.columnName,text:{}}}),
+    sdk:(v,ctx)=>"// Add a text metadata column to the container\n"+
+      "await graph\n  .api(`/storage/fileStorage/containers/${"+Cc("containerId")+"}/columns`)\n"+
+      "  .post({ name: "+Vv(q(v.columnName))+", text: "+Cc("{}")+" });",
+    rest:(v,ctx)=>Cc("POST")+" /storage/fileStorage/containers/"+Cc(short(ctx.container.id))+"/columns\n\n"+
+      '{ "name": '+Vv(q(v.columnName))+', "text": '+Cc("{}")+" }" },
+
+  { id:"tagMetadata", icon:"✎", title:"Tag document metadata", available:()=>true, need:{container:true,item:true},
+    desc:"Set metadata values on a file. Pick the file, then edit the values — the field NAMES are the container's columns (fixed); the VALUES are yours.",
+    vars:ctx=>ctx.s.columns.map(c=>({key:c.name,label:c.name,hint:"value for the "+c.name+" column",
+      def:(ctx.item&&ctx.item.columns&&ctx.item.columns[c.name])||"New value"})),
+    consts:ctx=>[["Endpoint","PATCH /drives/{cid}/items/{itemId}/listItem/fields"],
+      ["itemId",ctx.item?ctx.item.id:"—","the selected document"]],
+    request:(v,ctx)=>({method:"PATCH",path:"/drives/"+short(ctx.container.id)+"/items/"+ctx.item.id+"/listItem/fields",body:Object.assign({},v)}),
+    sdk:(v,ctx)=>"// Update metadata (list item fields) on a document\n"+
+      "await graph\n  .api(`/drives/${"+Cc("containerId")+"}/items/${"+Cc("itemId")+"}/listItem/fields`)\n  .patch({\n"+
+      ctx.s.columns.map(c=>"    "+c.name+": "+Vv(q(v[c.name]))).join(",\n")+"\n  });",
+    rest:(v,ctx)=>Cc("PATCH")+" /drives/"+Cc(short(ctx.container.id))+"/items/"+Cc(ctx.item.id)+"/listItem/fields\n\n{\n"+
+      ctx.s.columns.map(c=>'  "'+c.name+'": '+Vv(q(v[c.name]))).join(",\n")+"\n}" },
+
+  { id:"newVersion", icon:"⟳", title:"Create a new version", available:()=>true, need:{container:true,item:true},
+    desc:"Re-upload content to an existing file. SPE snapshots the previous bytes as a version automatically — there is nothing to configure.",
+    vars:ctx=>[],
+    consts:ctx=>[["Endpoint","PUT /drives/{cid}/items/{itemId}/content"],
+      ["itemId",ctx.item?ctx.item.id:"—","the file getting a new version"]],
+    request:(v,ctx)=>({method:"PUT",path:"/drives/"+short(ctx.container.id)+"/items/"+ctx.item.id+"/content",body:"<updated binary bytes>"}),
+    sdk:(v,ctx)=>"// Uploading new bytes to an existing item creates a new version automatically\n"+
+      "await graph.api(`/drives/${"+Cc("containerId")+"}/items/${"+Cc("itemId")+"}/content`).put("+Cc("updatedBytes")+");\n\n"+
+      "// Read the full version history:\n"+
+      "const versions = await graph.api(`/drives/${"+Cc("containerId")+"}/items/${"+Cc("itemId")+"}/versions`).get();",
+    rest:(v,ctx)=>Cc("PUT")+" /drives/"+Cc(short(ctx.container.id))+"/items/"+Cc(ctx.item.id)+"/content\n\n"+Cc("<updated binary bytes>") },
+
+  { id:"shareFile", icon:"🔗", title:"Share a file", available:()=>true, need:{container:true,item:true},
+    desc:"Create a sharing link. Choose the permission and scope — the link always respects the container's permission boundary.",
+    vars:ctx=>[
+      {key:"type",label:"Link type",type:"select",options:["view","edit"],hint:"view = read-only · edit = co-authoring",def:"edit"},
+      {key:"scope",label:"Scope",type:"select",options:["organization","anonymous"],hint:"who can use the link",def:"organization"}],
+    consts:ctx=>[["Endpoint","POST /drives/{cid}/items/{itemId}/createLink"],["itemId",ctx.item?ctx.item.id:"—"]],
+    request:(v,ctx)=>({method:"POST",path:"/drives/"+short(ctx.container.id)+"/items/"+ctx.item.id+"/createLink",body:{type:v.type,scope:v.scope}}),
+    sdk:(v,ctx)=>"// Create a sharing link for co-authoring / preview\n"+
+      "const link = await graph\n  .api(`/drives/${"+Cc("containerId")+"}/items/${"+Cc("itemId")+"}/createLink`)\n"+
+      "  .post({ type: "+Vv(q(v.type))+", scope: "+Vv(q(v.scope))+" });\nconsole.log(link.link.webUrl);",
+    rest:(v,ctx)=>Cc("POST")+" /drives/"+Cc(short(ctx.container.id))+"/items/"+Cc(ctx.item.id)+"/createLink\n\n"+
+      '{ "type": '+Vv(q(v.type))+', "scope": '+Vv(q(v.scope))+" }" },
+
+  { id:"search", icon:"🔎", title:"Search across containers", available:s=>s.hasSearch, need:{},
+    desc:"Full-text + metadata search over every container of this app's type. Only the query string changes.",
+    vars:ctx=>[{key:"queryString",label:"Search query",hint:"a keyword, file name, or metadata value",def:"agreement"}],
+    consts:ctx=>[["Endpoint","POST /search/query"],["entityTypes",'["driveItem"]',"search documents"]],
+    request:(v,ctx)=>({method:"POST",path:"/search/query",body:{requests:[{entityTypes:["driveItem"],query:{queryString:v.queryString}}]}}),
+    sdk:(v,ctx)=>"// Search across all containers of this container type\n"+
+      "const results = await graph.api("+Cc('"/search/query"')+").post({\n  requests: [{\n"+
+      "    entityTypes: "+Cc('["driveItem"]')+",\n    query: { queryString: "+Vv(q(v.queryString))+" }\n  }]\n});",
+    rest:(v,ctx)=>Cc("POST")+" /search/query\n\n{ \"requests\": [ { \"entityTypes\": "+Cc('["driveItem"]')+
+      ', "query": { "queryString": '+Vv(q(v.queryString))+" } } ] }" },
+
+  { id:"retention", icon:"🔒", title:"Apply a retention label", available:s=>s.hasRetention, need:{container:true,item:true},
+    desc:"Apply a Microsoft Purview retention label to lock a record against edits/deletion for its retention period.",
+    vars:ctx=>[{key:"label",label:"Retention label",type:"select",
+      options:["Public Record — 7 yr","Legal — 10 yr","Permanent — Archive","Personnel — 25 yr"],hint:"the compliance label to apply",def:"Public Record — 7 yr"}],
+    consts:ctx=>[["Endpoint","PATCH /drives/{cid}/items/{itemId}/retentionLabel"],["isRecordLocked","true","locks the record from deletion"]],
+    request:(v,ctx)=>({method:"PATCH",path:"/drives/"+short(ctx.container.id)+"/items/"+ctx.item.id+"/retentionLabel",
+      body:{name:v.label,retentionSettings:{behaviorDuringRetentionPeriod:"retain",isRecordLocked:true}}}),
+    sdk:(v,ctx)=>"// Apply a Purview retention label and lock the record\n"+
+      "await graph\n  .api(`/drives/${"+Cc("containerId")+"}/items/${"+Cc("itemId")+"}/retentionLabel`)\n  .patch({\n"+
+      "    name: "+Vv(q(v.label))+",\n    retentionSettings: { behaviorDuringRetentionPeriod: "+Cc('"retain"')+", isRecordLocked: "+Cc("true")+" }\n  });",
+    rest:(v,ctx)=>Cc("PATCH")+" /drives/"+Cc(short(ctx.container.id))+"/items/"+Cc(ctx.item.id)+"/retentionLabel\n\n"+
+      '{ "name": '+Vv(q(v.label))+', "retentionSettings": { "isRecordLocked": '+Cc("true")+" } }" },
+
+  { id:"legalHold", icon:"⚖", title:"Place / release legal hold", available:s=>s.hasContainerHold, need:{container:true},
+    desc:"Toggle an eDiscovery legal hold on the whole matter container via a searchable custom property.",
+    vars:ctx=>[{key:"value",label:"Hold on?",type:"select",options:["true","false"],hint:"true = preserve · false = release",def:"true"}],
+    consts:ctx=>[["Endpoint","PATCH /storage/fileStorage/containers/{id}"],["property","legalHold","a custom, searchable property"]],
+    request:(v,ctx)=>({method:"PATCH",path:"/storage/fileStorage/containers/"+short(ctx.container.id),
+      body:{customProperties:{legalHold:{value:v.value,isSearchable:true}}}}),
+    sdk:(v,ctx)=>"// Place / release a legal hold on the matter container\n"+
+      "await graph\n  .api(`/storage/fileStorage/containers/${"+Cc("containerId")+"}`)\n  .patch({\n"+
+      "    customProperties: { legalHold: { value: "+Vv(q(v.value))+", isSearchable: "+Cc("true")+" } }\n  });",
+    rest:(v,ctx)=>Cc("PATCH")+" /storage/fileStorage/containers/"+Cc(short(ctx.container.id))+"\n\n"+
+      '{ "customProperties": { "legalHold": { "value": '+Vv(q(v.value))+', "isSearchable": '+Cc("true")+" } } }" },
+
+  { id:"uploadSession", icon:"⬆", title:"Upload a large file (session)", available:s=>s.hasUploadSession, need:{container:true},
+    desc:"For files over ~4 MB you open a resumable upload session, then PUT byte ranges to the returned uploadUrl.",
+    vars:ctx=>[{key:"fileName",label:"File name",hint:"the large file to upload",def:ctx.s.docKinds.find(d=>/\.(mp4|ifc|psd|zip|pdf)$/i.test(d))||ctx.s.docKinds[0]}],
+    consts:ctx=>[["Endpoint","POST /drives/{cid}/items/root:/{fileName}:/createUploadSession"],["then","PUT byte ranges → uploadUrl","chunked, resumable"]],
+    request:(v,ctx)=>({method:"POST",path:"/drives/"+short(ctx.container.id)+"/items/root:/"+v.fileName+":/createUploadSession",
+      body:{item:{"@microsoft.graph.conflictBehavior":"replace",name:v.fileName}}}),
+    sdk:(v,ctx)=>"// Open a resumable upload session for a large file\n"+
+      "const session = await graph\n  .api(`/drives/${"+Cc("containerId")+"}/items/root:/"+Vv(v.fileName)+":/createUploadSession`)\n"+
+      "  .post({ item: { "+Cc('"@microsoft.graph.conflictBehavior": "replace"')+", name: "+Vv(q(v.fileName))+" } });\n\n"+
+      "// Then PUT byte ranges to session.uploadUrl (e.g. 10 MB chunks) until complete.",
+    rest:(v,ctx)=>Cc("POST")+" /drives/"+Cc(short(ctx.container.id))+"/items/root:/"+Vv(v.fileName)+":/createUploadSession\n\n"+
+      '{ "item": { "@microsoft.graph.conflictBehavior": "replace", "name": '+Vv(q(v.fileName))+" } }" },
+
+  { id:"preview", icon:"👁", title:"Preview a file (no download)", available:s=>s.hasPreview, need:{container:true,item:true},
+    desc:"Get a short-lived WOPI embed URL to render a file in-browser without downloading its bytes — ideal for PII/PHI or VDR view-only.",
+    vars:ctx=>[],
+    consts:ctx=>[["Endpoint","POST /drives/{cid}/items/{itemId}/preview"],["returns","getUrl (embed)","short-lived, renders as caller"]],
+    request:(v,ctx)=>({method:"POST",path:"/drives/"+short(ctx.container.id)+"/items/"+ctx.item.id+"/preview",body:{}}),
+    sdk:(v,ctx)=>"// Get a view-only embed URL (no bytes leave the tenant)\n"+
+      "const preview = await graph\n  .api(`/drives/${"+Cc("containerId")+"}/items/${"+Cc("itemId")+"}/preview`)\n  .post({});\n"+
+      "openInIframe(preview.getUrl);",
+    rest:(v,ctx)=>Cc("POST")+" /drives/"+Cc(short(ctx.container.id))+"/items/"+Cc(ctx.item.id)+"/preview\n\n"+Cc("{}") },
+
+  { id:"invite", icon:"📨", title:"Share one file with an external user", available:s=>s.hasInvite, need:{container:true,item:true},
+    desc:"Grant a single item (not the whole container) to an external collaborator — e.g. outside counsel or a subcontractor with no M365 license.",
+    vars:ctx=>[
+      {key:"email",label:"Recipient email",hint:"the external person to invite",def:"external@partner.com"},
+      {key:"role",label:"Role",type:"select",options:["read","write"],hint:"read = view · write = edit",def:"read"}],
+    consts:ctx=>[["Endpoint","POST /drives/{cid}/items/{itemId}/invite"],["requireSignIn","true","recipient must authenticate"]],
+    request:(v,ctx)=>({method:"POST",path:"/drives/"+short(ctx.container.id)+"/items/"+ctx.item.id+"/invite",
+      body:{recipients:[{email:v.email}],roles:[v.role],requireSignIn:true,sendInvitation:true}}),
+    sdk:(v,ctx)=>"// Share a single item with an external user\n"+
+      "await graph\n  .api(`/drives/${"+Cc("containerId")+"}/items/${"+Cc("itemId")+"}/invite`)\n  .post({\n"+
+      "    recipients: [{ email: "+Vv(q(v.email))+" }],\n    roles: ["+Vv(q(v.role))+"],\n    requireSignIn: "+Cc("true")+", sendInvitation: "+Cc("true")+"\n  });",
+    rest:(v,ctx)=>Cc("POST")+" /drives/"+Cc(short(ctx.container.id))+"/items/"+Cc(ctx.item.id)+"/invite\n\n"+
+      '{ "recipients": [{ "email": '+Vv(q(v.email))+' }], "roles": ['+Vv(q(v.role))+"] }" },
+
+  { id:"lock", icon:"🔒", title:"Lock a container (WORM / immutability)", available:s=>s.hasLock, need:{container:true},
+    desc:"Lock the whole container read-only for records immutability (e.g. SEC 17a-4, regulated archives). Unlock reverses it.",
+    vars:ctx=>[{key:"op",label:"Operation",type:"select",options:["lock","unlock"],hint:"lock = make read-only",def:"lock"}],
+    consts:ctx=>[["Endpoint","POST /storage/fileStorage/containers/{id}/{lock|unlock}"],["effect","read-only WORM state"]],
+    request:(v,ctx)=>({method:"POST",path:"/storage/fileStorage/containers/"+short(ctx.container.id)+"/"+v.op,body:v.op==="lock"?{mode:"full"}:{}}),
+    sdk:(v,ctx)=>"// Lock the container read-only (records immutability)\n"+
+      "await graph\n  .api(`/storage/fileStorage/containers/${"+Cc("containerId")+"}/"+Vv(v.op)+"`)\n  .post("+(("lock"===v.op)?"{ mode: "+Cc('"full"')+" }":"{}")+");",
+    rest:(v,ctx)=>Cc("POST")+" /storage/fileStorage/containers/"+Cc(short(ctx.container.id))+"/"+Vv(v.op)+"\n\n"+(v.op==="lock"?'{ "mode": "full" }':"{}") }
+];
+function availableRecipes(){return RECIPES.filter(r=>r.available(SCENARIOS[UI.current]));}
+
+function renderTryit(){
+  const box=document.getElementById("paneTryit"); if(!box) return;
+  const s=SCENARIOS[UI.current];
+  rcState.containerId=null; rcState.itemId=null;
+  const recs=availableRecipes();
+  box.innerHTML=
+    '<div class="pg-intro">🧭 <b>Guided API playground.</b> Pick an action, edit the '
+    +'<b style="color:#0e7a0b">green variables</b> (the parts you control, like a file name); the '
+    +'<b style="color:#8a6d00">grey constants</b> are fixed by SPE or your app. Watch the code build live, then '
+    +'<b>Run</b> and see the affected item flash in the <b>'+s.app+'</b> UI on the left.</div>'
+    +'<label class="rc-label">Step 1 · Choose an action</label>'
+    +'<select class="rc-select" id="rc_action">'
+    + recs.map(r=>'<option value="'+r.id+'">'+r.icon+'  '+r.title+'</option>').join('')
+    +'</select>'
+    +'<div id="rc_form"></div>'
+    +'<div class="pg-actions"><button class="pg-send" id="rc_run">▶ Run &amp; see impact</button></div>'
+    +'<div id="rc_out"></div>';
+  document.getElementById("rc_action").onchange=()=>{rcState.itemId=null;rcRenderForm();};
+  document.getElementById("rc_run").onclick=rcRun;
+  rcRenderForm();
+}
+
+function rcRenderForm(){
+  const s=SCENARIOS[UI.current];
+  const rec=availableRecipes().find(r=>r.id===document.getElementById("rc_action").value)||availableRecipes()[0];
+  const form=document.getElementById("rc_form");
+  const conts=Object.values(Store.containers).filter(c=>c.containerTypeId===s.ctId);
+  let step=2, h='<div class="rc-desc">'+rec.desc+'</div>';
+  let container=null,item=null;
+
+  if(rec.need&&rec.need.container){
+    const selCid=(rcState.containerId&&Store.containers[rcState.containerId]&&Store.containers[rcState.containerId].containerTypeId===s.ctId)
+      ?rcState.containerId:(Store.containers[UI.activeContainer]?UI.activeContainer:(conts[0]&&conts[0].id));
+    container=Store.containers[selCid]||conts[0]||null;
+    h+='<label class="rc-label">Step '+(step++)+' · Target container <span class="rc-lock">🔒 its id is a constant in the call</span></label>'
+      +'<select class="rc-select" id="rc_container">'
+      +conts.map(c=>'<option value="'+c.id+'"'+(container&&c.id===container.id?' selected':'')+'>'+c.displayName+'</option>').join('')
+      +'</select>';
+  }
+  const wireTargets=()=>{
+    const cs=document.getElementById("rc_container");
+    if(cs) cs.onchange=()=>{rcState.containerId=cs.value;rcState.itemId=null;rcRenderForm();};
+    const is=document.getElementById("rc_item");
+    if(is) is.onchange=()=>{rcState.itemId=is.value;rcRenderForm();};
+  };
+
+  if(rec.need&&rec.need.item){
+    const files=container?Object.values(Store.items[container.id]).filter(i=>!i.folder):[];
+    if(!files.length){
+      h+='<div class="pg-err" style="margin-top:10px">This action needs a file. Switch to “Add a file” first (or pick another container), then come back.</div>';
+      form.innerHTML=h; document.getElementById("rc_run").disabled=true; wireTargets(); return;
+    }
+    const selIid=(rcState.itemId&&files.find(f=>f.id===rcState.itemId))?rcState.itemId:files[0].id;
+    item=files.find(f=>f.id===selIid)||files[0];
+    h+='<label class="rc-label">Step '+(step++)+' · Target file <span class="rc-lock">🔒 its id is a constant</span></label>'
+      +'<select class="rc-select" id="rc_item">'
+      +files.map(f=>'<option value="'+f.id+'"'+(f.id===item.id?' selected':'')+'>'+f.name+'</option>').join('')
+      +'</select>';
+  }
+  document.getElementById("rc_run").disabled=false;
+  const ctx={s,container,item};
+  const vars=rec.vars(ctx);
+
+  if(vars.length){
+    h+='<label class="rc-label">Step '+(step++)+' · Edit the variables <span class="rc-lock">✎ these are the parts you change</span></label>';
+    vars.forEach(vd=>{
+      h+='<div class="rc-field"><div class="rc-vlabel">'+vd.label+'</div>';
+      if(vd.type==="select"){
+        h+='<select class="rc-var-input" id="rc_v_'+vd.key+'">'
+          +vd.options.map(o=>'<option'+(o===vd.def?' selected':'')+'>'+o+'</option>').join('')+'</select>';
+      } else {
+        h+='<input class="rc-var-input" id="rc_v_'+vd.key+'" value="'+esc(vd.def)+'"/>';
+      }
+      h+='<div class="rc-hint">'+vd.hint+'</div></div>';
+    });
+  } else {
+    h+='<div class="rc-hint" style="margin-top:10px">No variables for this action — it runs entirely from the target you selected above.</div>';
+  }
+
+  h+='<div class="rc-consts" id="rc_consts"></div>'
+    +'<div class="rc-code-head"><label class="rc-label" style="margin:0">Step '+step+' · Generated code</label>'
+    +'<div class="rc-toggle" id="rc_toggle">'
+    +'<button data-mode="sdk"'+(rcCodeMode==="sdk"?' class="active"':'')+'>SDK (TypeScript)</button>'
+    +'<button data-mode="rest"'+(rcCodeMode==="rest"?' class="active"':'')+'>REST</button></div>'
+    +'<button class="copy" id="rc_copy" style="margin-left:auto">Copy</button></div>'
+    +'<pre id="rc_code"></pre>'
+    +'<div class="rc-legend"><span><span class="k" style="background:#7ee787"></span>variable — you can change this</span>'
+    +'<span><span class="k" style="background:#e0b0a0"></span>constant — fixed by SPE / your app</span></div>';
+
+  form.innerHTML=h;
+  wireTargets();
+  vars.forEach(vd=>{const el=document.getElementById("rc_v_"+vd.key); if(el){el.oninput=rcUpdateCode; el.onchange=rcUpdateCode;}});
+  document.querySelectorAll("#rc_toggle button").forEach(b=>b.onclick=()=>{
+    rcCodeMode=b.dataset.mode;
+    document.querySelectorAll("#rc_toggle button").forEach(x=>x.classList.remove("active"));
+    b.classList.add("active"); rcUpdateCode();});
+  document.getElementById("rc_copy").onclick=()=>{
+    navigator.clipboard&&navigator.clipboard.writeText(document.getElementById("rc_code").innerText); toast("Code copied");};
+  rcUpdateCode();
+}
+
+function rcCurrent(){
+  const s=SCENARIOS[UI.current];
+  const actEl=document.getElementById("rc_action");
+  const rec=availableRecipes().find(r=>r.id===(actEl&&actEl.value))||availableRecipes()[0];
+  const conts=Object.values(Store.containers).filter(c=>c.containerTypeId===s.ctId);
+  let container=null,item=null;
+  if(rec.need&&rec.need.container){
+    const sel=document.getElementById("rc_container");
+    container=(sel&&Store.containers[sel.value])||Store.containers[UI.activeContainer]||conts[0]||null;
+  }
+  if(rec.need&&rec.need.item&&container){
+    const files=Object.values(Store.items[container.id]).filter(i=>!i.folder);
+    const sel=document.getElementById("rc_item");
+    item=(sel&&Store.items[container.id][sel.value])||files[0]||null;
+  }
+  return {s,rec,container,item};
+}
+function rcReadVars(rec,ctx){
+  const v={};
+  rec.vars(ctx).forEach(vd=>{const el=document.getElementById("rc_v_"+vd.key); v[vd.key]=el?el.value:vd.def;});
+  return v;
+}
+function rcUpdateCode(){
+  const ctx=rcCurrent(); if(!ctx.rec) return;
+  const v=rcReadVars(ctx.rec,ctx);
+  const tok=(rcCodeMode==="rest"?ctx.rec.rest:ctx.rec.sdk)(v,ctx);
+  const codeEl=document.getElementById("rc_code"); if(codeEl) codeEl.innerHTML=codeHtml(tok);
+  const consts=ctx.rec.consts(ctx)||[];
+  const ce=document.getElementById("rc_consts");
+  if(ce) ce.innerHTML='<div class="rc-consts-h">🔒 Constants in this call (fixed — not edited by hand)</div>'
+    +consts.map(c=>'• <b>'+c[0]+'</b>: <code>'+esc(String(c[1]))+'</code>'+(c[2]?' <span class="rc-cnote">— '+c[2]+'</span>':'')).join('<br>');
+}
+function rcRun(){
+  const ctx=rcCurrent(); const rec=ctx.rec; if(!rec) return;
+  const out=document.getElementById("rc_out");
+  if(rec.need&&rec.need.item&&!ctx.item){ out.innerHTML='<div class="pg-err">Select a file first.</div>'; return; }
+  const v=rcReadVars(rec,ctx);
+  const req=rec.request(v,ctx);
+  const beforeConts=new Set(Object.keys(Store.containers));
+  const beforeItems=ctx.container?new Set(Object.keys(Store.items[ctx.container.id])):new Set();
+  const before=Store.calls.length;
+  let result;
+  try{ result=routeRequest(req.method,req.path,req.body); }
+  catch(e){ out.innerHTML='<div class="pg-err">✖ '+esc(e.message)+'</div>'; return; }
+
+  const logged=Store.calls.length>before?Store.calls[0]:null;
+  const status=logged?logged.status:200;
+  const resp=logged?logged.response:result;
+
+  // decide which object to flash + which container to show on the left
+  if(rec.id==="createContainer"){
+    const nc=Object.keys(Store.containers).find(k=>!beforeConts.has(k));
+    if(nc){UI.activeContainer=nc;UI.flashId=nc;rcState.containerId=nc;}
+  } else if(ctx.container){
+    UI.activeContainer=ctx.container.id; rcState.containerId=ctx.container.id;
+    if(rec.id==="addFile"){
+      const nf=Object.keys(Store.items[ctx.container.id]).find(k=>!beforeItems.has(k));
+      UI.flashId=nf||null; rcState.itemId=nf||rcState.itemId;
+    } else { UI.flashId=ctx.item?ctx.item.id:ctx.container.id; if(ctx.item) rcState.itemId=ctx.item.id; }
+  }
+
+  renderApp(); renderBackend(); renderApiLog(); updateCounters();
+  const resultHtml='<div class="pg-result"><div class="rhead"><span class="method m-'+req.method+'">'+req.method+'</span>'
+    +'<span class="status '+(status<400?'s2':'s4')+'">'+status+'</span><span class="call-url">'+esc(req.path)+'</span></div>'
+    +'<pre>'+fmtJson(resp)+'</pre></div>'
+    +'<div class="pg-effect">✔ '+(result.effect||"Done")+' — the affected item is flashing in the '+ctx.s.app+' UI on the left. 👈</div>';
+  out.innerHTML=resultHtml+lastDiffHtml;
+  setTimeout(function(){UI.flashId=null;},1900);
+  rcRenderForm();   // refresh target dropdowns (new container/file now selectable); output is preserved
+  toast("API call executed — watch the left pane");
+}
+
+/* ---- request router: maps a REST request onto the simulated Graph engine ---- */
+function resolveContainer(idInPath){
+  if(Store.containers[idInPath]) return Store.containers[idInPath];
+  let hit=Object.values(Store.containers).find(c=>short(c.id)===idInPath);
+  if(hit) return hit;
+  return Object.values(Store.containers).find(c=>c.id.includes(idInPath))||null;
+}
+function needContainer(idInPath){
+  const c=resolveContainer(idInPath);
+  if(!c) throw new Error(`Container "${idInPath}" not found. Create one first, or copy an id from the Backend Store tab.`);
+  return c;
+}
+function needItem(c,itemId){
+  const it=Store.items[c.id][itemId];
+  if(!it) throw new Error(`Item "${itemId}" not found in that container.`);
+  return it;
+}
+function routeRequest(method,fullPath,body){
+  const path=fullPath.split("?")[0];
+  let m;
+  // containers collection
+  if(method==="POST" && /^\/storage\/fileStorage\/containers\/?$/.test(path)){
+    const b=body||{}; const c=Graph.createContainer(b.containerTypeId||SCENARIOS[UI.current].ctId,
+      b.displayName||sampleName(SCENARIOS[UI.current]),b.description||"");
+    UI.activeContainer=c.id; return {effect:"New container provisioned"};
+  }
+  if(method==="GET" && /^\/storage\/fileStorage\/containers\/?$/.test(path)){
+    Graph.listContainers(SCENARIOS[UI.current].ctId); return {effect:"Listed containers"};
+  }
+  // columns
+  if(method==="POST" && (m=path.match(/^\/storage\/fileStorage\/containers\/([^/]+)\/columns\/?$/))){
+    const c=needContainer(m[1]); const b=body||{};
+    Graph.addColumns(c.id,[{name:b.name||"NewColumn",text:{}}]); return {effect:`Column "${b.name}" added`};
+  }
+  // container patch (legal hold / custom properties)
+  if(method==="PATCH" && (m=path.match(/^\/storage\/fileStorage\/containers\/([^/]+)\/?$/))){
+    const c=needContainer(m[1]); const lh=body&&body.customProperties&&body.customProperties.legalHold;
+    if(lh){ Graph.legalHold(c.id, String(lh.value)==="true"); return {effect:"Legal hold updated"}; }
+    logCall("PATCH",`/storage/fileStorage/containers/${short(c.id)}`,{body,status:200,response:{id:c.id}});
+    return {effect:"Container updated"};
+  }
+  // upload by path
+  if(method==="PUT" && (m=path.match(/^\/drives\/([^/]+)\/root:\/(.+):\/content$/))){
+    const c=needContainer(m[1]); const name=decodeURIComponent(m[2].split("/").pop());
+    Graph.uploadFile(c.id,"root",name,{}); UI.activeContainer=c.id; return {effect:`"${name}" uploaded`};
+  }
+  // update content -> new version
+  if(method==="PUT" && (m=path.match(/^\/drives\/([^/]+)\/items\/([^/]+)\/content$/))){
+    const c=needContainer(m[1]); needItem(c,m[2]); Graph.addVersion(c.id,m[2]); return {effect:"New version created"};
+  }
+  // children (create folder or file, or list)
+  if(method==="POST" && (m=path.match(/^\/drives\/([^/]+)\/items\/([^/]+)\/children$/))){
+    const c=needContainer(m[1]); const b=body||{};
+    if(b.folder){ Graph.createFolder(c.id,m[2]==="root"?"root":m[2],b.name||"New folder"); return {effect:"Folder created"}; }
+    Graph.uploadFile(c.id,m[2]==="root"?"root":m[2],b.name||"document.docx",{}); return {effect:"Item created"};
+  }
+  if(method==="GET" && (m=path.match(/^\/drives\/([^/]+)\/items\/([^/]+)\/children$/))){
+    const c=needContainer(m[1]); Graph.listChildren(c.id,m[2]==="root"?"root":m[2]); return {effect:"Listed children"};
+  }
+  // metadata fields
+  if(method==="PATCH" && (m=path.match(/^\/drives\/([^/]+)\/items\/([^/]+)\/listItem\/fields$/))){
+    const c=needContainer(m[1]); needItem(c,m[2]); Graph.setItemColumns(c.id,m[2],body||{}); return {effect:"Metadata updated"};
+  }
+  // versions list
+  if(method==="GET" && (m=path.match(/^\/drives\/([^/]+)\/items\/([^/]+)\/versions$/))){
+    const c=needContainer(m[1]); needItem(c,m[2]); Graph.listVersions(c.id,m[2]); return {effect:"Listed versions"};
+  }
+  // create link
+  if(method==="POST" && (m=path.match(/^\/drives\/([^/]+)\/items\/([^/]+)\/createLink$/))){
+    const c=needContainer(m[1]); needItem(c,m[2]); const b=body||{};
+    Graph.createShareLink(c.id,m[2],b.type||"view",b.scope||"organization"); return {effect:"Sharing link created"};
+  }
+  // retention label
+  if(method==="PATCH" && (m=path.match(/^\/drives\/([^/]+)\/items\/([^/]+)\/retentionLabel$/))){
+    const c=needContainer(m[1]); needItem(c,m[2]); const b=body||{};
+    const yrs=parseInt((String(b.name||"").match(/\d+/)||[7])[0],10);
+    Graph.setRetention(c.id,m[2],b.name||"Retention label",yrs); return {effect:"Retention label applied"};
+  }
+  // search
+  if(method==="POST" && /^\/search\/query$/.test(path)){
+    const q=body&&body.requests&&body.requests[0]&&body.requests[0].query&&body.requests[0].query.queryString;
+    Graph.search(SCENARIOS[UI.current].ctId,q||"agreement"); return {effect:"Search executed"};
+  }
+  // large-file upload session
+  if(method==="POST" && (m=path.match(/^\/drives\/([^/]+)\/items\/([^/]+):\/(.+):\/createUploadSession$/))){
+    const c=needContainer(m[1]); const name=decodeURIComponent(m[3].split("/").pop());
+    Graph.createUploadSession(c.id,m[2]==="root"?"root":m[2],name,60); UI.activeContainer=c.id;
+    return {effect:'Upload session opened for "'+name+'"'};
+  }
+  // preview (WOPI, view-only)
+  if(method==="POST" && (m=path.match(/^\/drives\/([^/]+)\/items\/([^/]+)\/preview$/))){
+    const c=needContainer(m[1]); needItem(c,m[2]); Graph.previewItem(c.id,m[2]); return {effect:"View-only preview URL issued"};
+  }
+  // item invite (share one file)
+  if(method==="POST" && (m=path.match(/^\/drives\/([^/]+)\/items\/([^/]+)\/invite$/))){
+    const c=needContainer(m[1]); needItem(c,m[2]); const b=body||{};
+    const email=(b.recipients&&b.recipients[0]&&b.recipients[0].email)||"external@partner.com";
+    Graph.inviteItem(c.id,m[2],email,(b.roles&&b.roles[0])||"read"); return {effect:"Item shared with "+email};
+  }
+  // container lock / unlock
+  if(method==="POST" && (m=path.match(/^\/storage\/fileStorage\/containers\/([^/]+)\/(lock|unlock)$/))){
+    const c=needContainer(m[1]); Graph.lockContainer(c.id,m[2]==="lock"); return {effect:"Container "+m[2]+"ed"};
+  }
+  // copy item (archive)
+  if(method==="POST" && (m=path.match(/^\/drives\/([^/]+)\/items\/([^/]+)\/copy$/))){
+    const c=needContainer(m[1]); needItem(c,m[2]); const b=body||{}; Graph.copyItem(c.id,m[2],b.name); return {effect:"Copy to archive queued"};
+  }
+  // subscription (change notifications)
+  if(method==="POST" && /^\/subscriptions$/.test(path)){
+    const res=(body&&body.resource)||""; const idm=res.match(/drives\/([^/]+)\//);
+    const c=idm?needContainer(idm[1]):Store.containers[UI.activeContainer];
+    if(c) Graph.createSubscription(c.id); return {effect:"Subscription created"};
+  }
+  return null;
+}
+</script>
+
+<script>
+/* ============================================================================
+   6. SAMPLE CODE LIBRARY (shown in the "Sample Code" tab, copyable)
+   Real Microsoft Graph SDK / REST snippets keyed to each action.
+============================================================================ */
+function setCode(entry){
+  const block=document.getElementById("codeBlock");
+  const hint=document.getElementById("codeHint");
+  if(!entry){
+    block.innerHTML='<span class="tok-punc">// Trigger an action on the left to see the exact sample code here.</span>';
+    hint.textContent=""; return;
+  }
+  block.innerHTML=highlightCode(entry.code);
+  hint.textContent=entry.hint||"";
+  document.getElementById("codeLang").textContent=entry.lang||"TypeScript · Microsoft Graph SDK";
+  UI.lastCode=entry;
+}
+function highlightCode(src){
+  let s=esc(src);
+  s=s.replace(/(\/\/[^\n]*)/g,'<span class="tok-punc">$1</span>');
+  s=s.replace(/(&quot;[^&]*?&quot;|&#39;[^&]*?&#39;|`[^`]*?`)/g,'<span class="tok-str">$1</span>');
+  s=s.replace(/\b(const|let|await|async|function|return|new|import|from|if|for)\b/g,'<span class="tok-bool">$1</span>');
+  return s;
+}
+
+function codeFor(action,ctx={}){
+  const s=SCENARIOS[UI.current];
+  const cidVar=ctx.cid?`"${short(ctx.cid)}"`:"containerId";
+  const L={
+    createContainer:{lang:"TypeScript · Microsoft Graph SDK",
+      hint:"Containers are provisioned against a registered container type. Files live in the customer's tenant.",
+      code:
+`// Provision a new SharePoint Embedded container (${s.containerType})
+const container = await graph.api("/storage/fileStorage/containers").post({
+  displayName: "${ctx.name||sampleName(s)}",
+  description: "${ctx.desc||s.containerType}",
+  containerTypeId: "${s.ctId}"
+});
+
+// Define typed metadata columns on the container
+${s.columns.map(c=>`await graph.api(\`/storage/fileStorage/containers/\${container.id}/columns\`)
+  .post({ name: "${c.name}", text: {} });`).join("\n")}`},
+
+    upload:{lang:"TypeScript · Microsoft Graph SDK",hint:"Simple upload for files < 4 MB; use an upload session for larger files.",
+      code:
+`// Upload document bytes into the container drive
+const item = await graph
+  .api(\`/drives/\${${cidVar}}/root:/${ctx.name||"document.docx"}:/content\`)
+  .put(fileBytes);
+
+// Tag metadata columns on the uploaded document
+await graph.api(\`/drives/\${${cidVar}}/items/\${item.id}/listItem/fields\`).patch(${JSON.stringify(ctx.columns||{},null,2)});`},
+
+    metadata:{lang:"TypeScript · Microsoft Graph SDK",hint:"Metadata columns make documents queryable via search and filters.",
+      code:
+`// Update document metadata (list item fields)
+await graph
+  .api(\`/drives/\${${cidVar}}/items/\${itemId}/listItem/fields\`)
+  .patch(${JSON.stringify(ctx.fields||{},null,2)});`},
+
+    folder:{lang:"TypeScript · Microsoft Graph SDK",hint:"Folders help structure documents within a single container.",
+      code:
+`// Create a folder inside the container drive
+await graph.api(\`/drives/\${${cidVar}}/items/root/children\`).post({
+  name: "${ctx.name||"New folder"}",
+  folder: {},
+  "@microsoft.graph.conflictBehavior": "rename"
+});`},
+
+    version:{lang:"TypeScript · Microsoft Graph SDK",hint:"Re-uploading content to an existing item automatically creates a new version.",
+      code:
+`// Upload new content -> a new version is created automatically
+await graph.api(\`/drives/\${${cidVar}}/items/\${itemId}/content\`).put(updatedBytes);
+
+// List the full version history
+const versions = await graph.api(\`/drives/\${${cidVar}}/items/\${itemId}/versions\`).get();`},
+
+    coauthor:{lang:"TypeScript · Graph + Office for the web",hint:"An org-scoped edit link opens the file for real-time Office co-authoring.",
+      code:
+`// Create an organization edit link for live co-authoring
+const link = await graph.api(\`/drives/\${${cidVar}}/items/\${itemId}/createLink\`).post({
+  type: "edit",
+  scope: "organization"
+});
+// Embed link.webUrl in an <iframe> to co-author inside your app
+openInIframe(link.link.webUrl);`},
+
+    share:{lang:"TypeScript · Microsoft Graph SDK",hint:"Sharing links always honor the container's permission boundary.",
+      code:
+`// Create a read-only sharing link
+const link = await graph.api(\`/drives/\${${cidVar}}/items/\${itemId}/createLink\`).post({
+  type: "view",
+  scope: "organization"
+});
+console.log(link.link.webUrl);`},
+
+    search:{lang:"TypeScript · Microsoft Search API",hint:"Search spans every container of the app's container type at once.",
+      code:
+`// Search across all containers of this container type
+const results = await graph.api("/search/query").post({
+  requests: [{
+    entityTypes: ["driveItem"],
+    query: { queryString: "${ctx.q||"agreement"}" },
+    sharePointOneDriveOptions: { includeHiddenContent: true }
+  }]
+});`},
+
+    legalHold:{lang:"TypeScript · Graph (container property)",hint:"A searchable custom property records the hold; combine with Purview eDiscovery holds.",
+      code:
+`// Place the matter container on legal hold via a custom property
+await graph.api(\`/storage/fileStorage/containers/\${${cidVar}}\`).patch({
+  customProperties: {
+    legalHold: { value: "true", isSearchable: true }
+  }
+});`},
+
+    itemHold:{lang:"TypeScript · Microsoft Graph SDK",hint:"Flag individual filings for preservation within a matter.",
+      code:
+`// Mark a filing as preserved for eDiscovery
+await graph.api(\`/drives/\${${cidVar}}/items/\${itemId}/listItem/fields\`).patch({
+  LegalHold: "Preserved"
+});`},
+
+    retention:{lang:"TypeScript · Graph + Microsoft Purview",hint:"Retention labels can lock records against edit/delete for the retention period.",
+      code:
+`// Apply a Purview retention label and lock the record
+await graph.api(\`/drives/\${${cidVar}}/items/\${itemId}/retentionLabel\`).patch({
+  name: "${ctx.label||"Public Record — 7 yr"}",
+  retentionSettings: {
+    behaviorDuringRetentionPeriod: "retain",
+    isRecordLocked: true
+  }
+});`},
+
+    foia:{lang:"TypeScript · Microsoft Graph eDiscovery",hint:"Compile a defensible export package for a public-records / FOIA request.",
+      code:
+`// Create an eDiscovery search to compile a FOIA export set
+await graph.api("/security/cases/ediscoveryCases/{caseId}/searches").post({
+  displayName: "FOIA export",
+  contentQuery: "public records"
+});`},
+
+    approval:{lang:"TypeScript · Graph (metadata state machine)",hint:"Drive an ECN/ECO approval workflow through metadata columns + change notifications.",
+      code:
+`// Advance the engineering-change approval workflow
+await graph.api(\`/drives/\${${cidVar}}/items/\${itemId}/listItem/fields\`).patch({
+  ApprovalStatus: "${ctx.next||"In Review"}",
+  ApprovedBy: "eng.lead@contoso.com",
+  ApprovedDateTime: new Date().toISOString()
+});`},
+
+    stage:{lang:"TypeScript · Graph (workflow state)",hint:"Advance the business workflow by writing the Stage column; pair with change notifications to trigger downstream automation.",
+      code:
+`// Advance the workflow stage on this document
+await graph.api(\`/drives/\${${cidVar}}/items/\${itemId}/listItem/fields\`).patch({
+  Stage: "${ctx.next||"Next stage"}"
+});`}
+  };
+  return L[action]||null;
+}
+
+/* ============================================================================
+   7. BESPOKE PER-APP VIEWS — each industry app owns its own front end.
+   The same SPE engine underneath; a completely different UX on top.
+============================================================================ */
+function cFiles(c){return c?Object.values(Store.items[c.id]).filter(i=>!i.folder):[];}
+function speAdvance(cid){const c=Store.containers[cid];const it=focusFile(c);if(it)advanceStage(cid,it.id);}
+function roomTabs(conts,glyph){return '<div class="roomsel">'+conts.map(c=>
+  `<div class="roomtab ${UI.activeContainer===c.id?'active':''}" onclick="selectContainer('${c.id}')" style="--ac:${SCENARIOS[UI.current].color}">
+     <span>${glyph}</span>${c.displayName}${c.locked?' 🔒':''}${c.legalHold?' ⚖':''}</div>`).join('')+'</div>';}
+function newBtn(s){return `<button class="mini solid" style="--ac:${s.color}" onclick="openNewContainer()">＋ ${esc(s.term.newContainer)}</button>`;}
+
+const VIEWS={};
+
+/* 1. ClauseWorks — CLM kanban board of matters by stage */
+VIEWS.legal=function(main,s,conts){
+  const cols=s.pipeline.map(st=>({st,cards:[]}));
+  conts.forEach(c=>{const it=focusFile(c);const stage=(it&&it.columns&&it.columns.Stage)||s.pipeline[0];
+    (cols.find(x=>x.st===stage)||cols[0]).cards.push({c,it});});
+  main.innerHTML=`<div class="vtoolbar">${newBtn(s)}<span class="chip b">${conts.length} matters</span>
+    <button class="mini ghost" onclick="openSearch()">🔎 Renewals report</button>
+    <span style="color:var(--muted);font-size:11.5px">Drag-free board — click a matter, then act. Each matter = one SPE container.</span></div>
+   <div class="kanban" style="--ac:${s.color}">`+cols.map(col=>
+     `<div class="kcol"><div class="kcol-h">${col.st}<span>${col.cards.length}</span></div>`+
+      col.cards.map(({c,it})=>{const k=it?(it.columns||{}):{};
+        return `<div class="kcard ${UI.activeContainer===c.id?'sel':''}" style="--ac:${s.color}" onclick="selectContainer('${c.id}')">
+          <div class="kt">${c.displayName}</div>
+          <div class="kmeta">${k.Counterparty?`<span class="chip">${k.Counterparty}</span>`:''}
+            ${k.Value&&k.Value!=='0'?`<span class="chip p">${money(k.Value)}</span>`:''}
+            ${k.Status?`<span class="chip ${k.Status==='Flagged'?'r':k.Status==='Standard'?'g':'a'}">${k.Status}</span>`:''}
+            ${k.RenewalDate?`<span class="chip">⏰ ${k.RenewalDate}</span>`:''}</div>
+          <div class="kact">
+            <button class="mini" onclick="event.stopPropagation();runScenarioAction('collab','coauthor','${c.id}'${it?`,'${it.id}'`:''})">✍ Word</button>
+            <button class="mini" onclick="event.stopPropagation();runScenarioAction('ai','oblig','${c.id}'${it?`,'${it.id}'`:''})">🤖 Review</button>
+            <button class="mini ghost" title="Advance stage" onclick="event.stopPropagation();speAdvance('${c.id}')">→</button>
+          </div></div>`;}).join('')+`</div>`).join('')+`</div>`;
+};
+
+/* 2. DealVault — M&A virtual data room */
+VIEWS.finance=function(main,s,conts){
+  const c=Store.containers[UI.activeContainer]; const files=cFiles(c);
+  const bidder=c&&/Bidder/.test(c.displayName);
+  main.innerHTML=roomTabs(conts,'🗄')
+   +(c?`<div class="barrier">🚧 <b>Information barrier:</b> viewing <b>${c.displayName}</b>. Each bidder room is its own SPE container — ${bidder?"this bidder can't see any other bidder's room.":"bidder rooms are fully isolated from each other."}</div>`:'')
+   +(c&&c.locked?`<div class="lockrib">🔒 Room locked (WORM) — read-only for SEC 17a-4 immutability.</div>`:'')
+   +`<div class="vtoolbar">${newBtn(s)}
+      <button class="mini ghost" onclick="runScenarioAction('collab','bulk','${c?c.id:''}')">⬆ Bulk upload (large)</button>
+      <button class="mini ghost" onclick="runScenarioAction('security','lock','${c?c.id:''}')">🔒 Lock room</button>
+      <button class="mini ghost" onclick="runScenarioAction('ai','coc','${c?c.id:''}')">🤖 Find change-of-control</button></div>`
+   +(files.length?`<table class="vdr-table"><thead><tr><th>Document</th><th>Category</th><th>Tier</th><th>Access</th><th></th></tr></thead><tbody>`+
+      files.map(it=>{const k=it.columns||{};return `<tr>
+        <td>${fileIcon(it.name)} ${it.name}</td><td>${k.DiligenceCategory||'—'}</td>
+        <td><span class="chip ${k.ConfTier==='High'?'r':'a'}">${k.ConfTier||'—'}</span></td>
+        <td>${k.ViewOnly==='Yes'?'<span class="nodl">no download</span>':'<span class="chip g">full</span>'}</td>
+        <td><button class="mini" onclick="runScenarioAction('collab','preview','${c.id}','${it.id}')">👁 Preview</button></td></tr>`;}).join('')
+      +`</tbody></table>`:'<div class="empty">Empty room — bulk-upload diligence documents.</div>');
+};
+
+/* 3. TrialFile — eTMF completeness matrix */
+VIEWS.healthcare=function(main,s,conts){
+  const c=Store.containers[UI.activeContainer]; const files=cFiles(c);
+  const complete=files.filter(f=>(f.columns||{}).EdlStatus==='Complete').length;
+  const pct=files.length?Math.round(complete/files.length*100):0;
+  const missing=files.filter(f=>(f.columns||{}).EdlStatus==='Missing');
+  main.innerHTML=roomTabs(conts,'🧬')
+   +`<div class="edl-top"><div class="ring" style="--p:${pct};--ac:${s.color}"><i>${pct}%</i></div>
+      <div><div style="font-weight:700">EDL completeness — inspection readiness (DIA TMF Reference Model)</div>
+      <div style="color:var(--muted);font-size:12px">${complete}/${files.length} essential documents filed · <b style="color:${missing.length?'#a4262c':'#0e7a0b'}">${missing.length} missing</b></div>
+      <div class="vtoolbar" style="margin-top:8px">${newBtn(s)}
+        <button class="mini ghost" onclick="runScenarioAction('collab','scan','${c?c.id:''}')">⬆ Upload scan</button>
+        <button class="mini ghost" onclick="runScenarioAction('ai','complete','${c?c.id:''}')">🤖 Completeness check</button></div></div></div>`
+   +`<div class="edl-grid">`+files.map(it=>{const k=it.columns||{};const cls=k.EdlStatus==='Complete'?'complete':k.EdlStatus==='Missing'?'missing':'pending';
+      return `<div class="edl-tile ${cls}"><div class="z">${k.Zone||''}</div><div class="a">${k.Artifact||it.name}</div>
+       <div style="margin-bottom:6px"><span class="chip ${cls==='complete'?'g':cls==='missing'?'r':'a'}">${k.EdlStatus||'—'}</span> <span class="chip">QC ${k.QcStatus||'—'}</span></div>
+       <div>${/Consent|ICF/i.test(it.name)?`<button class="mini" onclick="runScenarioAction('collab','consent','${c.id}','${it.id}')">✍ Co-author</button>`:''}
+        <button class="mini" onclick="runScenarioAction('ai','classify','${c.id}','${it.id}')">🤖 Classify</button></div></div>`;}).join('')+`</div>`;
+};
+
+/* 4. ClaimDesk — adjuster workbench */
+VIEWS.insurance=function(main,s,conts){
+  const c=Store.containers[UI.activeContainer]; const files=cFiles(c); const k0=(files[0]&&files[0].columns)||{};
+  const tc=t=>({Photo:'#c43501',Report:'#5c2e91',Estimate:'#0e7a0b',Medical:'#a4262c',Unclassified:'#8a6d00'}[t]||'#605e5c');
+  const ic=t=>({Photo:'🖼',Report:'📄',Estimate:'📊',Medical:'🏥'}[t]||'📎');
+  main.innerHTML=roomTabs(conts,'🛟')
+   +(c?`<div class="claimhdr" style="--ac:${s.color}"><div><div style="font-size:11px;color:var(--muted)">CLAIM</div><div style="font-weight:700">${c.displayName}</div></div>
+      <div><div style="font-size:11px;color:var(--muted)">RESERVE</div><div class="big">${money(k0.Reserve||0)}</div></div>
+      <div><div style="font-size:11px;color:var(--muted)">LOB · ADJUSTER</div><div>${k0.LOB||'—'} · ${k0.Adjuster||'—'}</div></div>
+      <div class="ab-pill" style="--ac:${s.color}">Stage: ${k0.Stage||'FNOL'}</div></div>`:'')
+   +`<div class="vtoolbar">${newBtn(s)}
+      <button class="mini ghost" onclick="runScenarioAction('collab','sub','${c?c.id:''}')">🔔 Auto-ingest (delta)</button>
+      <button class="mini ghost" onclick="runScenarioAction('collab','media','${c?c.id:''}')">⬆ Ingest media</button></div>`
+   +`<div class="cw-grid"><div><div class="section-h">Evidence & documents</div><div class="gallery">`+
+     files.map(it=>{const t=(it.columns||{}).Classification;return `<div class="gtile">
+       <div class="gthumb" style="background:${tc(t)}">${ic(t)}</div>
+       <div class="gc"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${it.name}</div><span class="chip">${t||'—'}</span><br>
+       <button class="mini" onclick="runScenarioAction('collab','preview','${c.id}','${it.id}')">👁</button>
+       <button class="mini" onclick="runScenarioAction('ai','ocr','${c.id}','${it.id}')">OCR</button></div></div>`;}).join('')
+     +`</div></div><div><div class="copilot-card"><h4>🤖 Adjuster copilot</h4>
+        <div style="font-size:12px;color:var(--muted)">Grounded on this case file only (Copilot Retrieval API).</div>
+        <button class="mini solid" style="--ac:#5c2e91;margin-top:8px" onclick="runScenarioAction('ai','summ','${c?c.id:''}')">Summarize this claim</button>
+        <ul class="checklist"><li>☑ Repair estimate received</li><li>☐ Recorded statement</li><li>☐ Medical authorization</li></ul></div></div></div>`;
+};
+
+/* 5. BuildSet — drawing register + RFI log */
+VIEWS.construction=function(main,s,conts){
+  const c=Store.containers[UI.activeContainer]; const files=cFiles(c);
+  const draws=files.filter(f=>(f.columns||{}).DrawingNumber&&f.columns.DrawingNumber!=='—');
+  const rfis=files.filter(f=>(f.columns||{}).RfiStatus&&f.columns.RfiStatus!=='—');
+  main.innerHTML=roomTabs(conts,'🏗')
+   +`<div class="vtoolbar">${newBtn(s)}
+      <button class="mini ghost" onclick="runScenarioAction('collab','upload','${c?c.id:''}')">⬆ Upload drawing (large)</button>
+      <button class="mini ghost" onclick="runScenarioAction('collab','invite','${c?c.id:''}')">📨 Invite sub / owner (no license)</button></div>`
+   +`<div class="section-h">Drawing register — “current set”</div>`
+   +(draws.length?`<table class="reg-table"><thead><tr><th>Drawing</th><th>Discipline</th><th>Rev</th><th>Status</th><th></th></tr></thead><tbody>`+
+     draws.map(it=>{const k=it.columns||{};return `<tr><td>${k.DrawingNumber} · ${it.name}</td><td>${k.Discipline||'—'}</td>
+       <td><span class="revchip" style="--ac:${s.color}">Rev ${k.Revision}</span></td>
+       <td>${it.versions&&it.versions.length>1?`<span class="chip a">${it.versions.length-1} superseded</span>`:'<span class="chip g">current</span>'}</td>
+       <td><button class="mini" onclick="runScenarioAction('collab','rev','${c.id}','${it.id}')">⟳ Publish rev</button>
+        <button class="mini" onclick="runScenarioAction('collab','preview','${c.id}','${it.id}')">👁</button></td></tr>`;}).join('')+`</tbody></table>`:'<div class="empty">No drawings yet.</div>')
+   +`<div class="section-h">RFI log</div>`+(rfis.length?rfis.map(it=>{const k=it.columns||{};
+      return `<div class="rfi"><span>📩</span><div style="flex:1">${it.name} <span class="chip">${k.Discipline||''}</span></div>
+       <span class="chip ${k.RfiStatus==='Open'?'r':'g'}">${k.RfiStatus}</span></div>`;}).join(''):'<div class="empty">No open RFIs.</div>');
+};
+
+/* 6. BrandVault — DAM asset gallery */
+VIEWS.media=function(main,s,conts){
+  const c=Store.containers[UI.activeContainer]; const files=cFiles(c);
+  const today=new Date('2026-09-07');
+  const tc=t=>({Image:'#b4009e',Video:'#5c2e91',Brief:'#0f6cbd'}[t]||'#605e5c');
+  const ti=t=>({Image:'🖼',Video:'🎬',Brief:'📝'}[t]||'📎');
+  main.innerHTML=roomTabs(conts,'🎬')
+   +`<div class="vtoolbar">${newBtn(s)}
+      <button class="mini ghost" onclick="runScenarioAction('collab','ingest','${c?c.id:''}')">⬆ Bulk ingest media</button>
+      <button class="mini ghost" onclick="runScenarioAction('ai','search','${c?c.id:''}')">🔎 Semantic search</button></div>`
+   +`<div class="assets">`+files.map(it=>{const k=it.columns||{};
+       let exp='';if(k.ExpiryDate){const d=(new Date(k.ExpiryDate)-today)/864e5;if(d>=0&&d<=30)exp=`<span class="expwarn">⏳ ${Math.round(d)}d</span>`;}
+       return `<div class="asset"><div class="thumb" style="background:${tc(k.AssetType)}">${ti(k.AssetType)}${exp}</div>
+        <div class="abody"><div class="an">${it.name}</div>
+        <div class="atags">${k.Tags?k.Tags.split(',').map(t=>`<span class="chip b">${t.trim()}</span>`).join(''):'<span class="chip a">untagged</span>'}
+          ${k.ApprovalState?`<span class="chip ${k.ApprovalState==='Approved'?'g':'a'}">${k.ApprovalState}</span>`:''}</div>
+        <div class="aact"><button class="mini" onclick="runScenarioAction('ai','tag','${c.id}','${it.id}')">🤖 AI tag</button>
+         <button class="mini" onclick="runScenarioAction('collab','dist','${c.id}','${it.id}')">🔗 Distribute</button></div></div></div>`;}).join('')+`</div>`;
+};
+
+window.VIEWS=VIEWS;
+
+/* boot */
+boot();
+</script>
+</body>
+</html>
